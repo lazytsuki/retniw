@@ -1,73 +1,50 @@
-# React + TypeScript + Vite
+# 语音笔记 (Voice Notes)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+浏览器录音 → Groq Whisper 转文字 → Supabase 存储 → 浏览管理
 
-Currently, two official plugins are available:
+## 本地运行
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### 1. 克隆项目
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/lazytsuki/cc_lazytsuki.git
+cd cc_lazytsuki
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. 配置环境变量
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+复制 `.env.example` 为 `.env`，填入你的 key：
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
+
+```
+VITE_SUPABASE_URL=https://你的项目ID.supabase.co
+VITE_SUPABASE_ANON_KEY=你的Supabase Publishable Key
+GROQ_API_KEY=你的Groq API Key
+```
+
+### 3. 创建数据库表
+
+在 Supabase 控制台 → SQL Editor 中运行 `supabase-schema.sql` 的内容。
+
+### 4. 启动
+
+```bash
+npm run dev
+```
+
+打开 http://localhost:5173 即可使用。
+
+## 使用方法
+
+1. 点击红色录音按钮开始录音
+2. 再次点击停止录音
+3. 自动转录并保存
+4. 在下方列表查看历史笔记
+
+## 技术栈
+
+React + Vite + TypeScript + Tailwind CSS + Supabase + Groq Whisper API
