@@ -74,6 +74,8 @@
   - "品牌IP定名咖喱狗：固定贴头横向软耳、扁宽脸、低垂椭圆眼、忧虑眉、点鼻和偏侧短嘴；动作与载体可变，识别骨架不变"
   - "同事内测选择最轻闭环：使用稳定Vercel网址、关闭公开注册、每人独立Supabase账号与退出入口；首轮不增加邀请后台或邮件系统"
   - "内测账号闭环已在真实Supabase验证：账号A写入后账号B按同一ID读取返回404；退出后首页重新转到登录页；临时测试账号与数据已删除"
+  - "第二版已部署到 https://retniw.vercel.app：五个生产环境变量已注入，远程构建完成，登录、Enter保存、主动DeepSeek追问、退出和品牌资源均通过生产环境验证"
+  - "Vercel项目已连接lazytsuki/retniw，后续推送GitHub默认分支会自动触发部署；本机无需持续运行"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -87,9 +89,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "按上线检查清单完成Vercel环境配置与正式发布"
+- suggested_next_action: "收集首轮内测邮箱并创建独立账号"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
-- last_confirmed_stage: code_review
+- last_confirmed_stage: production_beta
 - confirmation_gate: ""
 - release_checklist: done
