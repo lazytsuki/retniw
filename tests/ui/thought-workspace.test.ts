@@ -31,6 +31,16 @@ describe('thought workspace acceptance boundaries', () => {
     expect(css).toContain('@media (max-width: 560px)')
   })
 
+  it('keeps page chrome and action groups inside narrow mobile viewports', async () => {
+    const css = await readFile('src/index.css', 'utf8')
+    expect(css).toMatch(/\.app-shell \{[\s\S]*width: 100%;[\s\S]*max-width: 1440px;/)
+    expect(css).toMatch(/\.app-header \{[\s\S]*grid-template-columns: minmax\(52px, 1fr\) auto minmax\(52px, 1fr\)/)
+    expect(css).toMatch(/\.logout-form button \{[\s\S]*white-space: nowrap;/)
+    expect(css).toMatch(/@media \(max-width: 560px\)[\s\S]*\.ai-actions \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    expect(css).not.toContain('grid-template-columns: minmax(420px, 0.92fr)')
+    expect(css).not.toContain('grid-template-columns: minmax(0, 1.05fr) minmax(400px, 0.95fr)')
+  })
+
   it('renders AI and Markdown imports as Markdown without formatting user text', async () => {
     const workspace = await readFile('src/components/thoughts/thought-workspace.tsx', 'utf8')
     const entryContent = await readFile('src/components/thoughts/entry-content.tsx', 'utf8')

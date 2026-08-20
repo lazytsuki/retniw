@@ -17,13 +17,19 @@
 }
 
 html {
+  width: 100%;
   min-height: 100%;
+  overflow-x: clip;
   background: #08090b;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
+  width: 100%;
   min-height: 100vh;
   margin: 0;
+  overflow-x: clip;
   background:
     radial-gradient(circle at 12% 7%, rgb(72 112 112 / 20%), transparent 31rem),
     radial-gradient(circle at 86% 76%, rgb(78 65 104 / 14%), transparent 34rem),
@@ -54,10 +60,11 @@ a {
 }
 
 .app-shell {
-  width: min(100% - 64px, 1440px);
+  width: 100%;
+  max-width: 1440px;
   min-height: 100vh;
   margin: 0 auto;
-  padding-bottom: 64px;
+  padding: 0 max(32px, env(safe-area-inset-right)) 64px max(32px, env(safe-area-inset-left));
 }
 
 .app-header {
@@ -65,7 +72,7 @@ a {
   z-index: 20;
   top: 14px;
   display: grid;
-  grid-template-columns: 36px 1fr 36px;
+  grid-template-columns: minmax(52px, 1fr) auto minmax(52px, 1fr);
   align-items: center;
   height: 60px;
   margin-top: 14px;
@@ -110,11 +117,13 @@ a {
 }
 
 .logout-form button {
+  min-width: 44px;
   padding: 6px 8px;
   border: 0;
   background: transparent;
   color: rgb(245 245 243 / 38%);
   font-size: 11px;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 140ms ease;
 }
@@ -148,13 +157,14 @@ a {
 
 .capture-layout {
   display: grid;
-  grid-template-columns: minmax(420px, 0.92fr) minmax(460px, 1.08fr);
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   gap: clamp(72px, 9vw, 144px);
   padding-top: clamp(64px, 9vh, 112px);
 }
 
 .capture-column {
   position: sticky;
+  min-width: 0;
   top: 48px;
   align-self: start;
 }
@@ -182,6 +192,9 @@ a {
 }
 
 .capture-surface {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   border-radius: 26px;
   background: linear-gradient(145deg, rgb(255 255 255 / 9%), transparent 42%), rgb(17 21 24 / 72%);
@@ -199,6 +212,8 @@ a {
 .capture-surface textarea {
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 280px;
   padding: 28px 28px 12px;
   resize: none;
@@ -225,6 +240,8 @@ input::placeholder {
 }
 
 .capture-actions > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: rgb(245 245 243 / 42%);
   font-size: 13px;
 }
@@ -348,11 +365,14 @@ a.fragment-card:hover {
 }
 
 .thought-main {
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 
 .thought-tools,
 .export-menu {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -403,6 +423,7 @@ a.fragment-card:hover {
 }
 
 .thought-entry {
+  min-width: 0;
   padding: 22px 4px;
   border-bottom: 1px solid rgb(255 255 255 / 8%);
 }
@@ -515,6 +536,7 @@ a.fragment-card:hover {
   position: fixed;
   inset: 0;
   width: min(620px, calc(100% - 32px));
+  min-width: 0;
   max-width: none;
   max-height: calc(100dvh - 32px);
   margin: auto;
@@ -688,7 +710,8 @@ a.fragment-card:hover {
 }
 
 .ai-actions {
-  width: fit-content;
+  width: max-content;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -789,6 +812,7 @@ a.fragment-card:hover {
   margin: 0;
   color: rgb(245 245 243 / 78%);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .relation-candidate blockquote {
@@ -798,6 +822,7 @@ a.fragment-card:hover {
   color: rgb(245 245 243 / 48%);
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .relation-actions {
@@ -821,6 +846,8 @@ a.fragment-card:hover {
 
 .thought-recent {
   position: sticky;
+  min-width: 0;
+  max-width: 100%;
   top: 34px;
 }
 
@@ -864,6 +891,7 @@ a.fragment-card:hover {
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .thought-link time {
@@ -922,7 +950,7 @@ a.fragment-card:hover {
 
 .detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(400px, 0.95fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: clamp(64px, 9vw, 148px);
   align-items: start;
   padding-top: clamp(64px, 9vh, 112px);
@@ -943,6 +971,8 @@ a.fragment-card:hover {
 }
 
 .fragment-original {
+  min-width: 0;
+  max-width: 100%;
   padding: clamp(28px, 4vw, 48px);
   border-radius: 24px;
 }
@@ -955,6 +985,7 @@ a.fragment-card:hover {
   letter-spacing: -0.04em;
   line-height: 1.25;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .session {
@@ -966,10 +997,14 @@ a.fragment-card:hover {
 
 .timeline {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   gap: 12px;
 }
 
 .timeline-card {
+  min-width: 0;
+  max-width: 100%;
   padding: 24px;
   border-radius: 20px;
 }
@@ -1012,6 +1047,7 @@ a.fragment-card:hover {
   color: rgb(245 245 243 / 62%);
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .timeline-actions {
@@ -1187,7 +1223,8 @@ a.fragment-card:hover {
 
 @media (max-width: 900px) {
   .app-shell {
-    width: min(100% - 32px, 700px);
+    max-width: 732px;
+    padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
   }
 
   .capture-layout,
@@ -1213,11 +1250,14 @@ a.fragment-card:hover {
 
 @media (max-width: 560px) {
   .app-shell {
-    width: min(100% - 24px, 700px);
+    max-width: none;
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
     padding-bottom: 36px;
   }
 
   .app-header {
+    grid-template-columns: minmax(48px, 1fr) auto minmax(48px, 1fr);
     top: 8px;
     height: 54px;
     margin-top: 8px;
@@ -1252,13 +1292,16 @@ a.fragment-card:hover {
   }
 
   .ai-actions {
+    display: grid;
     width: 100%;
-    justify-content: space-between;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     border-radius: 18px;
   }
 
   .ai-actions button {
-    padding-inline: 10px;
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
   }
 
   .export-menu {
@@ -1266,6 +1309,8 @@ a.fragment-card:hover {
   }
 
   .import-dialog {
+    width: calc(100% - 24px);
+    max-height: calc(100dvh - 24px);
     padding: 18px;
   }
 
@@ -1282,6 +1327,15 @@ a.fragment-card:hover {
   .capture-actions {
     min-height: 62px;
     padding: 0 12px 12px 20px;
+  }
+
+  .capture-actions > span {
+    max-width: calc(100% - 58px);
+    font-size: 12px;
+  }
+
+  .logout-form button {
+    font-size: 12px;
   }
 
   .fragment-card {

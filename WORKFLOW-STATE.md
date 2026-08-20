@@ -76,6 +76,7 @@
   - "内测账号闭环已在真实Supabase验证：账号A写入后账号B按同一ID读取返回404；退出后首页重新转到登录页；临时测试账号与数据已删除"
   - "第二版已部署到 https://retniw.vercel.app：五个生产环境变量已注入，远程构建完成，登录、Enter保存、主动DeepSeek追问、退出和品牌资源均通过生产环境验证"
   - "Vercel项目已连接lazytsuki/retniw，并将GitHub默认分支配置为Production Branch；后续推送会自动更新正式域名，本机无需持续运行"
+  - "跨端响应式底座补正：页面壳统一使用安全区内边距，双栏取消硬最小宽度，顶栏操作禁止拆字，移动端AI操作改为两列；首页、登录、导入弹层、详情长内容在Chromium与WebKit的320至1440像素视口均无横向溢出"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -89,7 +90,7 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "收集首轮内测邮箱并创建独立账号"
+- suggested_next_action: "继续首轮内测并收集真实使用反馈"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
 - last_confirmed_stage: production_beta
