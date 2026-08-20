@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerAuthClient } from '@/src/lib/supabase/server'
 import { login } from './actions'
+import { RetniwSymbol } from '@/src/components/app-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +22,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="shell">
       <section className="panel panel--compact" aria-labelledby="login-title">
-        <p className="login-brand">retniw</p>
+        <p className="login-brand"><RetniwSymbol /><span>retniw</span></p>
         <h1 id="login-title">登录</h1>
-        <p className="muted">仅限本人使用</p>
+        <p className="muted">邀请内测</p>
         <form action={login} className="login-form">
           <label>
             邮箱
@@ -36,6 +37,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {error ? <p className="form-error">邮箱或密码不正确。</p> : null}
           <button type="submit">登录</button>
         </form>
+        <p className="login-note">
+          每位体验者使用自己的账号。请勿记录工作机密；主动使用 AI 时，当前过程会交给 DeepSeek 处理。
+        </p>
       </section>
     </main>
   )

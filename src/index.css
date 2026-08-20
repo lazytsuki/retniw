@@ -99,7 +99,6 @@ a {
   width: 25px;
   height: 25px;
   overflow: visible;
-  fill: none;
   stroke: var(--accent);
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -107,13 +106,44 @@ a {
   filter: drop-shadow(0 0 8px rgb(191 216 208 / 26%));
 }
 
-.brand-symbol circle {
+.brand-symbol__head,
+.brand-symbol__brow,
+.brand-symbol__mouth {
+  fill: none;
+}
+
+.brand-symbol__eye,
+.brand-symbol__nose {
   fill: var(--accent);
   stroke: none;
 }
 
+.brand-symbol__lid {
+  fill: none;
+  stroke: #10161b;
+  stroke-width: 0.7;
+}
+
 .header-anchor {
   width: 36px;
+}
+
+.logout-form {
+  justify-self: end;
+}
+
+.logout-form button {
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: rgb(245 245 243 / 38%);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.logout-form button:hover {
+  color: rgb(245 245 243 / 72%);
 }
 
 .back-link {
@@ -1102,8 +1132,24 @@ a.fragment-card:hover {
 }
 
 .login-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   margin: 0 0 54px;
-  font-weight: 640;
+  color: #f5f5f3;
+}
+
+.login-brand .brand-symbol {
+  width: 28px;
+  height: 28px;
+}
+
+.login-brand span {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 23px;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 
 .panel h1 {
@@ -1153,6 +1199,13 @@ a.fragment-card:hover {
   background: #efefec;
   color: #111315;
   cursor: pointer;
+}
+
+.login-note {
+  margin: 22px 0 0;
+  color: rgb(245 245 243 / 34%);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 @media (max-width: 900px) {
