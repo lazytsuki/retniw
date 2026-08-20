@@ -96,32 +96,9 @@ a {
 }
 
 .brand-symbol {
-  width: 25px;
-  height: 25px;
-  overflow: visible;
-  stroke: var(--accent);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.65;
-  filter: drop-shadow(0 0 8px rgb(191 216 208 / 26%));
-}
-
-.brand-symbol__head,
-.brand-symbol__brow,
-.brand-symbol__mouth {
-  fill: none;
-}
-
-.brand-symbol__eye,
-.brand-symbol__nose {
-  fill: var(--accent);
-  stroke: none;
-}
-
-.brand-symbol__lid {
-  fill: none;
-  stroke: #10161b;
-  stroke-width: 0.7;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
 }
 
 .header-anchor {
@@ -1140,8 +1117,8 @@ a.fragment-card:hover {
 }
 
 .login-brand .brand-symbol {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
 }
 
 .login-brand span {

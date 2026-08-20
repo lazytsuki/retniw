@@ -1,6 +1,6 @@
-const SHELL_CACHE = 'retniw-shell-v2'
+const SHELL_CACHE = 'retniw-shell-v3'
 const STATIC_CACHE = 'retniw-static-v2'
-const SHELL_ASSETS = ['/offline', '/favicon.svg', '/icon-192.svg', '/icon-512.svg']
+const SHELL_ASSETS = ['/offline', '/favicon.png', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS)))
