@@ -1,0 +1,91 @@
+# WORKFLOW-STATE
+
+- current_stage: implementation_complete
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈"
+- main_artifacts:
+  - REQUIREMENT-ANALYSIS.md
+  - PRD.md
+  - TECH-DESIGN.md
+  - TASK-STATUS.md
+  - TASK-M-001-数据迁移与新结构.md
+  - TASK-M-002-连续思考工作区.md
+  - TASK-M-003-主动AI推进.md
+  - TASK-M-004-独立关系发现.md
+  - TASK-M-005-开放导入导出.md
+  - TASK-M-006-跨端可用性验收.md
+  - CODE-REVIEW.md
+  - 上线checkList.md
+  - archive/tasks-v1/
+- confirmed_decisions:
+  - "首版选择 A：手机优先、Mac 可访问，并需要跨端同步"
+  - "Capture 首发入口选择 A：从手机桌面图标打开，直接进入无标题、无分类的捕捉页"
+  - "Capture首版只保留文字输入；语音转写移至后续迭代，确认独立供应商后再立项"
+  - "用户允许同类前置问题合并呈现并一次回答"
+  - "Clarify 选择 1A：原始碎片先保存，再在当前页面给出一个可跳过的问题"
+  - "Reconnect 选择 2A：首版包含单个候选连接，并由用户确认"
+  - "PRD V1.1 已确认：retniw 是与工作无关的个人自驱项目，需求、开发、验证和验收不依赖外部干系人或企业系统"
+  - "技术形态选择 1A：Next.js App Router 全栈 PWA 部署到 Vercel，新建 Supabase 项目"
+  - "同步策略选择 2A：Supabase 在线数据为准，本地只保存草稿与失败重试项"
+  - "首版模型服务改为DeepSeek：使用deepseek-v4-flash非思考模式承担Clarify和Reconnect"
+  - "技术约束：非必要不增加系统或实体，不引入独立后端、消息队列、向量库或第二模型供应商"
+  - "技术方案审查修订：详情页补触发Clarify/Reconnect；既有连接对不复活；离线冷启动边界明确；详情接口返回连接对端原文"
+  - "旧版TECH-DESIGN.md曾由用户确认并完成实现；该方案以单条碎片为核心，已被PRD V2.0取代，不再作为后续实现依据"
+  - "任务拆解已生成并通过专用校验：六个纵向模块、六张必须做任务卡，数据库变更只引用 TECH-DESIGN.md"
+  - "任务拆解已由用户审查确认；M-001 补全旧 Vite 入口、组件、数据与 Groq 文件清理清单，并明确保留 useAudioRecorder 供 M-003 重构"
+  - "新 Supabase 项目 retniw 已创建于 ap-southeast-2；三表 DDL 已执行、RLS 已启用、公开注册已关闭"
+  - "retniw 所有者账号已使用个人 ChatGPT 登录邮箱创建；登录凭据只保存在本机钥匙串"
+  - "M-001 已完成：普通会话、无客户端策略 RLS、跨账号资源隔离、账号删除级联和 PWA 生产入口验证通过"
+  - "M-002 已完成：文字原文先保存、服务端并发幂等、最近列表与详情、IndexedDB 草稿和失败重试均已通过真实接口与浏览器验收"
+  - "浏览器验收补正 Service Worker 注册时机；新访问可自动注册，离线冷启动返回明确离线页"
+  - "用户确认语音转写作为后续迭代扩展；首版撤下语音入口，不配置OpenAI，不增加第二模型供应商"
+  - "M-004依赖由M-003调整为M-002；M-006首版验收不再依赖语音任务"
+  - "M-004已完成：DeepSeek澄清适配、唯一问题补发、首次回答与跨账号隔离通过自动测试、真实Supabase和移动端浏览器验证"
+  - "M-005已完成：单候选重连、双方原文、确认或否定、冲突处理和已决定关系不复活通过自动测试、真实Supabase和移动端浏览器验证"
+  - "交互雏形重做：桌面首页与详情使用左右分栏，900px以下切为单列；删去理念式标语，只保留直接操作文案；视觉采用深色低对比玻璃层"
+  - "DeepSeek密钥从误粘贴的源码迁移到本机钥匙串retniw-deepseek-api-key，仓库无明文；真实deepseek-v4-flash澄清和重连调用通过"
+  - "首轮可用性反馈确认原交互未闭环：保存后去向不清、Clarify与Reconnect互相阻塞、开发入口混入产品界面"
+  - "交互改为顺序闭环：Enter保存并进入详情，先生成可选问题，回答或跳过后再检查关联，详情始终可继续记录；开发环境自动清理旧PWA缓存并隐藏Next.js开发入口"
+  - "用户否定以单条碎片为唯一延伸容器，要求同时支持碎片捕捉与连续交流，并把retniw定义为可引入外部上下文、也可导出碎片、连续内容和关系的开放出海口"
+  - "需求分析默认完整连续思考过程长期保留；首版输入开放到粘贴、Markdown和纯文本，输出开放到复制、Markdown及包含关系的结构化数据"
+  - "普通输入不自动触发AI；AI仅由用户主动调用，内容按发生顺序和来源组织"
+  - "新版需求分析已由用户确认；PRD按连续思考、按需AI、开放导入导出和非阻塞关系重写"
+  - "正式文档采用先消化后落笔：只保留影响理解、执行或验收的事实、决策、系统行为与边界；必要解释可以保留，对话中的纠偏和自我证明不直接进入文档"
+  - "PRD V2.0已由用户确认，技术方案据此重做"
+  - "新版技术方案以thought作为持续过程、entry作为不可覆盖内容段、thought connection作为过程关系；普通输入不自动调用AI"
+  - "现有fragments、clarifications和connections采用非破坏幂等迁移，旧表本次不删除，旧链接重定向到同ID thought"
+  - "DeepSeek主动操作改为SSE流式返回；保存、同步、AI和关系检查使用独立状态"
+  - "首版导入由浏览器读取md/txt正文，不增加对象存储；过程Markdown和全量结构化数据使用流式导出"
+  - "旧版TASK-STATUS.md和六张旧任务卡已完整归档到archive/tasks-v1/"
+  - "PRD V2.0任务拆解已生成并通过专用校验：六个纵向模块，依次覆盖非破坏迁移、连续工作区、主动AI、独立关系、开放导入导出和跨端验收"
+  - "PRD V2.0的M-001已完成：新三表与RLS生效，3个旧过程、8段内容和1条关系双次幂等迁移及真实接口验收通过；旧表与旧正文保留"
+  - "PRD V2.0的M-002已完成：首页和详情使用同一连续工作区，四段连续追加、旧链接重定向、IndexedDB失败保留及生产离线刷新重试通过"
+  - "PRD V2.0的M-003已完成：推进、追问和整理仅由用户触发，真实DeepSeek流式输出独立保存；浏览器32毫秒出现本地状态，AI运行时仍可继续记录"
+  - "PRD V2.0的M-004已完成：关系检查独立运行，候选同时展示双方原文；真实并发只生成一条关系，确认或忽略只能决定一次，忽略后再次检查不复活"
+  - "PRD V2.0的M-005已完成：粘贴和md/txt原文可进入当前或新过程，单段可复制；过程Markdown和全量retniw.export.v1均流式导出，超过4.5MB仍可解析且只含已确认关系"
+  - "PRD V2.0的M-006已完成：手机与Mac同功能、局部加载、草稿与滚动位置恢复、离线重试、个人数据不缓存和基础安全响应头均验收通过"
+  - "PRD V2.0实现验收完成：lint、类型检查、64个自动测试和生产构建通过；真实Supabase、DeepSeek、关系并发、越权隔离、大文件导出与旧表零新增通过"
+  - "终局代码审查结论为有条件通过：本地第二版无阻塞问题，未执行的Vercel正式部署单独列入上线检查清单"
+  - "第二版显示契约补正：AI内容和.md导入按Markdown安全渲染，普通用户原文和.txt仍按纯文本显示；最近列表只显示去格式摘要"
+  - "第二版弹层布局补正：导入弹层相对页面视口居中，不受桌面左右栏布局约束，小屏超高时弹层内滚动"
+  - "第二版保存链路补正：用户内容先在当前工作区乐观落下，后台同步不再触发router.refresh或整页加载态；首次保存只无刷新替换URL"
+  - "第二版AI事实边界补正：只有用户输入与导入内容可作为事实来源；历史AI输出不进入模型上下文，每次AI输出后必须先有新的用户内容才能再次调用"
+  - "第二版视觉收口：原创回流线标记与斜体字标组成retniw品牌；液态玻璃只用于顶栏、输入、操作组和浮层，正文保持平面与高可读性"
+- prd_template_source:
+  title: "【PRD】基础产品需求文档"
+  page_id: "72xNrWDr3E1KMOymaOLx"
+  source_url: "https://joyspace.jd.com/pages/72xNrWDr3E1KMOymaOLx"
+- prd_export_metadata:
+  exported_at: "2026-06-30T13:50:00.000Z"
+  export_tool: "joyspace-to-markdown/scripts/export-joyspace-markdown.mjs"
+  source_commit: "39372c1a9fbca388171a0d3b62cd448ae29df2cf"
+- genui_source_commit: ""
+- prototype_workspace: ""
+- implementation_target: "/Users/liyingliang.7/retniw"
+- prototype_reuse: reference-only
+- open_questions_in_dialogue: ""
+- suggested_next_action: "按上线检查清单完成Vercel环境配置与正式发布"
+- joyspace_sync_status: "not_requested"
+- awaiting_user_confirmation: false
+- last_confirmed_stage: code_review
+- confirmation_gate: ""
+- release_checklist: done

@@ -1,50 +1,60 @@
-# 语音笔记 (Voice Notes)
+# retniw
 
-浏览器录音 → Groq Whisper 转文字 → Supabase 存储 → 浏览管理
+retniw 承接刚出现的想法，也允许它继续生长。内容可以从别处进入，也可以完整带走。
 
-## 本地运行
+## 第二版
 
-### 1. 克隆项目
+- 打开首页直接写；Enter 保存，Shift + Enter 换行。
+- 可以在同一个过程中连续追加，不会被强制拆成独立对话。
+- 保存后内容立即留在当前页面，后台同步不会触发整页刷新。
+- AI 默认不回应。需要推进、追问或整理时，由用户主动调用；每次 AI 输出后，必须先有新的用户输入或导入内容才能再次调用。
+- 可以粘贴外部文字，或导入 `.md`、`.txt`；`.md` 按 Markdown 显示，其他原文按纯文本保留。
+- 可以复制单段、导出一个过程的 Markdown，或导出全部内容和已确认关系的 JSON。
+- 手机和 Mac 使用同一份内容；本机保存未提交草稿和失败重试项。
+- 关系发现独立运行，不阻塞记录，也不会复活已经忽略的关系。
+
+用户的写作和思考是主体。AI 只在用户需要推进、追问、整理或寻找联系时介入，历史 AI 输出不会被当作用户事实继续扩写。
+
+早期 React、Vite、Supabase 匿名直连、Groq 和单碎片流程只作历史参考，不是当前产品约束。语音转写留到后续迭代。
+
+## 本地启动
+
+1. 安装依赖并准备本地配置：
 
 ```bash
-git clone https://github.com/lazytsuki/cc_lazytsuki.git
-cd cc_lazytsuki
 npm install
+cp .env.example .env.local
 ```
 
-### 2. 配置环境变量
+2. 在 `.env.local` 配置以下变量：
 
-复制 `.env.example` 为 `.env`，填入你的 key：
-
-```bash
-cp .env.example .env
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY
+DEEPSEEK_API_KEY
+DEEPSEEK_MODEL
 ```
 
-```
-VITE_SUPABASE_URL=https://你的项目ID.supabase.co
-VITE_SUPABASE_ANON_KEY=你的Supabase Publishable Key
-GROQ_API_KEY=你的Groq API Key
-```
+业务表使用 [TECH-DESIGN.md](TECH-DESIGN.md) 中的 DDL；Supabase 项目需关闭公开注册，只创建项目所有者账号。
 
-### 3. 创建数据库表
-
-在 Supabase 控制台 → SQL Editor 中运行 `supabase-schema.sql` 的内容。
-
-### 4. 启动
+3. 启动开发服务器：
 
 ```bash
 npm run dev
 ```
 
-打开 http://localhost:5173 即可使用。
+在当前 Mac 上，`npm run dev` 和 `npm start` 会自动从钥匙串项目 `retniw-deepseek-api-key` 读取 DeepSeek 密钥；部署环境仍通过 `DEEPSEEK_API_KEY` 注入。无需把密钥写进源码。
 
-## 使用方法
+浏览器打开 [http://localhost:3000](http://localhost:3000)。本地服务停止后需要重新执行 `npm run dev`；部署到线上后不需要本机保持运行。
 
-1. 点击红色录音按钮开始录音
-2. 再次点击停止录音
-3. 自动转录并保存
-4. 在下方列表查看历史笔记
+不要将 `.env.local` 或任何凭据提交到仓库。
 
-## 技术栈
+## 验证
 
-React + Vite + TypeScript + Tailwind CSS + Supabase + Groq Whisper API
+```bash
+npm run test
+npm run typecheck
+npm run lint
+npm run build
+```
