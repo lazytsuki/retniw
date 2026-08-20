@@ -75,7 +75,7 @@
   - "同事内测选择最轻闭环：使用稳定Vercel网址、关闭公开注册、每人独立Supabase账号与退出入口；首轮不增加邀请后台或邮件系统"
   - "内测账号闭环已在真实Supabase验证：账号A写入后账号B按同一ID读取返回404；退出后首页重新转到登录页；临时测试账号与数据已删除"
   - "第二版已部署到 https://retniw.vercel.app：五个生产环境变量已注入，远程构建完成，登录、Enter保存、主动DeepSeek追问、退出和品牌资源均通过生产环境验证"
-  - "Vercel项目已连接lazytsuki/retniw，后续推送GitHub默认分支会自动触发部署；本机无需持续运行"
+  - "Vercel项目已连接lazytsuki/retniw，并将GitHub默认分支配置为Production Branch；后续推送会自动更新正式域名，本机无需持续运行"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
