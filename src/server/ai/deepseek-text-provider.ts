@@ -90,9 +90,9 @@ export class DeepSeekTextProvider {
     }
 
     const instructions: Record<AiAction, string> = {
-      advance: '基于用户最后一条新输入，给出一个下一步可写的方向。第一句以“可以继续写：”开头，只写一到三句。只能提出可补充的角度，不能代写具体经历、场景或结论。',
+      advance: '从用户最后一条新输入出发，只给一个最有用的下一步：要么问一个具体问题，要么指出一个可以继续想的角度。不要同时给多个选项，不要添加“可以继续写”“建议”“下一步”等标题或前缀，不要替用户作答。只写一到两句。',
       question: '只输出一句具体且有推进作用的中文问句，最后一个字符必须是“？”。禁止复述输入原句，禁止输出陈述句，不要替用户回答。',
-      organize: '整理当前思考的已有内容，保留不确定性和原意，清楚呈现已形成的部分与仍然开放的部分。',
+      organize: '只整理用户已经写下或导入的内容，不分析人格，不增加解释。用不超过三个短段清楚呈现已经说清的部分和仍然开放的部分，总计不超过180个汉字；内容少时不要为了格式凑段落。不要使用“我能确认”“听起来”“你描述的情况是”等聊天口吻。',
     }
     const context = entries
       .filter((entry) => entry.entryType === 'user' || entry.entryType === 'import')
@@ -219,7 +219,7 @@ export class DeepSeekTextProvider {
 
   async findConnection(current: ConnectionThought, candidates: ConnectionThought[]) {
     const result = (await this.complete(
-      '判断当前思考是否与一个候选思考存在值得用户确认的直接联系。只返回 JSON，格式为 {"targetThoughtId":"候选id或null","sourceEntryId":"当前思考中的依据entry id或null","targetEntryId":"候选思考中的依据entry id或null","rationale":"简短理由或null"}。没有明确联系时四个字段都返回null。不得返回输入之外的思考或entry id。',
+      '输入只包含用户自己写下或导入的内容。判断当前想法是否与一个旧想法存在值得用户亲自确认的直接联系。只返回 JSON，格式为 {"targetThoughtId":"候选id或null","sourceEntryId":"当前想法中的依据entry id或null","targetEntryId":"旧想法中的依据entry id或null","rationale":"一句讲人话的简短理由或null"}。理由只说明两段内容共同关注什么，不得出现“当前思考”“候选”“entry”“匹配”等系统词。没有明确联系时四个字段都返回null。不得返回输入之外的想法或entry id。',
       { current, candidates },
     )) as Record<string, unknown>
 

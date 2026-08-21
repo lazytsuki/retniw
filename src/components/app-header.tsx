@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import Image from 'next/image'
 import { logout } from '@/app/auth/actions'
 
@@ -15,25 +14,21 @@ export function RetniwSymbol() {
   )
 }
 
-export function AppHeader({ back = false }: { back?: boolean }) {
+export function AppHeader() {
   return (
     <header className="app-header">
-      {back ? (
-        <Link className="back-link" href="/" aria-label="返回">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 5 8 12l7 7" />
-          </svg>
-        </Link>
-      ) : (
-        <span className="header-anchor" aria-hidden="true" />
-      )}
-      <Link className="brand" href="/">
+      <span className="brand">
         <RetniwSymbol />
         <span>retniw</span>
-      </Link>
-      <form action={logout} className="logout-form">
-        <button type="submit">退出</button>
-      </form>
+      </span>
+      <details className="account-menu">
+        <summary>账号</summary>
+        <div className="account-menu__panel">
+          <form action={logout}>
+            <button type="submit">退出登录</button>
+          </form>
+        </div>
+      </details>
     </header>
   )
 }

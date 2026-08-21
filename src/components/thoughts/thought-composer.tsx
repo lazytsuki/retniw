@@ -4,9 +4,15 @@ import type { RefObject } from 'react'
 
 type ThoughtComposerProps = {
   content: string
+  hasEntries: boolean
   onChange: (content: string) => void
   onSubmit: () => void
   textareaRef?: RefObject<HTMLTextAreaElement | null>
+}
+
+export function thoughtComposerCopy(hasEntries: boolean) {
+  const text = hasEntries ? '继续写这个想法' : '写下现在想到的'
+  return { ariaLabel: text, placeholder: text }
 }
 
 export function shouldSubmitThought(event: {
@@ -18,15 +24,16 @@ export function shouldSubmitThought(event: {
   return event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229
 }
 
-export function ThoughtComposer({ content, onChange, onSubmit, textareaRef }: ThoughtComposerProps) {
+export function ThoughtComposer({ content, hasEntries, onChange, onSubmit, textareaRef }: ThoughtComposerProps) {
+  const copy = thoughtComposerCopy(hasEntries)
   return (
     <div className="thought-composer capture-surface">
       <textarea
         ref={textareaRef}
         autoFocus
         maxLength={10_000}
-        aria-label="继续记录"
-        placeholder="写下此刻想到的"
+        aria-label={copy.ariaLabel}
+        placeholder={copy.placeholder}
         value={content}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {

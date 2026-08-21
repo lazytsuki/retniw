@@ -1,22 +1,35 @@
 'use client'
 
 import type { AiActionState } from '@/src/hooks/use-ai-action'
+import { aiOutputForDisplay } from '@/src/lib/ai-output'
 import { EntryContent } from './entry-content'
 
-const labels = { advance: '推进', question: '追问', organize: '整理' }
+const labels = {
+  advance: '一个可继续的方向',
+  question: '一个可继续的问题',
+  organize: '整理后的内容',
+}
 
 export function StreamingAiEntry({ state, onClear }: { state: AiActionState; onClear: () => void }) {
   if (state.status === 'idle' || state.status === 'saved') return null
+  const content = aiOutputForDisplay(state.content, state.action)
 
   return (
     <article className="thought-entry thought-entry--ai-live" aria-live="polite">
-      <p className="entry-source">AI · {state.action ? labels[state.action] : ''}</p>
-      {state.content ? <EntryContent content={state.content} markdown /> : <p className="ai-waiting">正在处理</p>}
+      <p className="entry-source entry-source--assist">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 5v5a4 4 0 0 0 4 4h8" />
+          <path d="m15 11 3 3-3 3" />
+          <circle cx="6" cy="5" r="2" />
+        </svg>
+        {state.action ? labels[state.action] : ''}
+      </p>
+      {content ? <EntryContent content={content} markdown /> : <p className="ai-waiting">正在看这段想法</p>}
       {state.status === 'error' && (
         <div className="ai-unsaved">
           <span>{state.message}</span>
-          {state.content && (
-            <button type="button" onClick={() => void navigator.clipboard.writeText(state.content)}>
+          {content && (
+            <button type="button" onClick={() => void navigator.clipboard.writeText(content)}>
               复制
             </button>
           )}

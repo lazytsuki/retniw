@@ -1,9 +1,9 @@
 ---
 delivery_scope: fullstack
-source_inputs: PRD.md, WORKFLOW-STATE.md, package.json, app/page.tsx, app/fragments/[id]/page.tsx, app/api/fragments/route.ts, app/api/fragments/[id]/route.ts, src/components/capture/capture-composer.tsx, src/components/fragments/fragment-timeline.tsx, src/hooks/use-capture-outbox.ts, src/lib/capture/capture-store.ts, src/server/repositories/fragment-repository.ts, src/server/repositories/fragment-detail-repository.ts, src/server/ai/deepseek-text-provider.ts, public/sw.js, 用户确认 2026-08-19
+source_inputs: PRD.md, COMPETITIVE-BRIEF.md, WORKFLOW-STATE.md, package.json, app/page.tsx, app/thoughts/[id]/page.tsx, app/api/thoughts/route.ts, src/components/app-header.tsx, src/components/thoughts/thought-workspace.tsx, src/components/thoughts/thought-navigation.tsx, src/components/thoughts/thinking-assist.tsx, src/components/thoughts/thought-menu.tsx, src/server/repositories/thought-repository.ts, src/hooks/use-capture-outbox.ts, src/lib/capture/capture-store.ts, src/server/ai/deepseek-text-provider.ts, public/sw.js, 用户确认 2026-08-21
 codebase_path: /Users/liyingliang.7/retniw
 codebase_mode: brownfield
-implementation_target: retniw-v2
+implementation_target: /Users/liyingliang.7/retniw
 persistent_reference_states: delete
 database_change: new_table
 sql_dialect: postgresql
@@ -16,6 +16,10 @@ sql_dialect: postgresql
 
 | 位置 | 处理 | 结果 |
 | --- | --- | --- |
+| `AppHeader`、新增 `ThoughtNavigation` | 重构 | 页头保持平面；桌面常驻、移动固定只展示“写新想法”和“以前的想法”两个导航动作 |
+| `ThoughtWorkspace`、`ThoughtComposer` | 重构 | 空白状态用一句话串起写下与回来；当前想法直接在主区继续；首页与详情用不同 key 隔离状态 |
+| `ThinkingAssist`、`ThoughtMenu`、关系检查触发 | 重构 | 正文旁只保留“帮我接着想”；整理进入更多操作；找联系进入旧想法区域 |
+| `GET /api/thoughts`、所有想法列表 | 复用 | 使用现有游标继续加载，避免把首批二十条误称为全部内容 |
 | `CaptureComposer`、`FragmentTimeline` | 重写 | 保存后留在当前过程，输入始终可继续 |
 | `fragments`、`clarifications`、`connections` | 停止写入 | 旧数据迁入新结构，旧表保留作回退 |
 | 新增 `thoughts`、`entries`、`thought_connections` | 新建 | 分开保存思考过程、内容段和关系 |
@@ -25,7 +29,9 @@ sql_dialect: postgresql
 
 - 页面和数据围绕“思考过程”组织。一个过程可以只有一段，也可以持续追加；每段内容独立、不可覆盖。[PRD]
 - 用户输入、导入内容和 AI 输出统一按发生顺序展示，但保留各自来源。普通输入只保存，不自动生成 AI 回复。[PRD]
-- AI 只在用户选择“推进”“追问”“整理”时生成内容；“寻找联系”启动关系检查，不生成一段聊天回复。DeepSeek 主输出使用 SSE，页面收到首个可读片段后立即展示。[PRD][DeepSeek 官方接口](https://api-docs.deepseek.com/api/create-chat-completion/)
+- AI 只在用户选择“帮我接着想”、整理或找联系时介入；普通记录、导入、同步和详情回看均不自动调用模型。“帮我接着想”由模型自行选择问一个具体问题或指出一个角度，界面不暴露内部策略枚举。DeepSeek 主输出使用 SSE，页面收到首个可读片段后立即展示。[PRD][用户确认]
+- 页面结构只把“写新想法”和“以前的想法”作为导航：桌面端使用常驻侧栏，移动端在主区上方使用两项常驻导航和旧想法面板；当前想法是主区状态，品牌、返回和退出不再复用为新建或切换入口。[PRD][COMPETITIVE-BRIEF]
+- 关系检查只向模型发送`entryType=user|import`的内容，已有指向 AI entry 的旧候选在再次检查时标记为rejected，不再展示为用户自己的想法。[PRD][用户反馈]
 - 保存、同步、AI 和关系检查是四套独立状态。任何一项失败都不撤销本地内容，也不锁住输入框。[PRD]
 - `.md`、`.txt`文件由浏览器读取，不上传原文件、不增加对象存储；服务端只接收正文和来源名称。[设计决策]
 - 新数据结构与旧三表并存。迁移后新代码只读写新表；旧表不删除，确认新版本稳定后再另行决定清理。[设计决策]
@@ -42,12 +48,12 @@ flowchart TD
     B --> C[立即写入页面和 IndexedDB]
     C --> D[后台同步 thoughts 和 entries]
     D --> E[继续输入]
-    D --> F[独立检查关系]
     E --> D
     E --> G{用户主动调用 AI}
     G --> H[DeepSeek 流式返回]
     H --> I[完成后保存为 AI 内容段]
     I --> E
+    E --> F{用户主动寻找联系}
     F --> J{有候选}
     J -->|是| K[用户保留或否定]
     J -->|否| E
@@ -58,13 +64,32 @@ flowchart TD
 
 ### 前端
 
+#### 统一的工作区导航
+
+- 需求/验收：未听过产品介绍的用户能在5秒内找到新想法和已有想法；手机与Mac入口含义一致，不依靠返回箭头或品牌标识切换。
+- 实现目标：`retniw-v2`，让新建、继续和回看成为所有工作区页面的稳定骨架。
+- 现状逻辑与代码证据：[`AppHeader`](src/components/app-header.tsx#AppHeader)在详情页用返回箭头回到首页，品牌本身也链接首页，退出直接占据顶栏；[`ThoughtWorkspace`](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)只在右栏有“最近”，900px以下会排到当前长内容末尾，且只渲染服务端首批二十条。
+- 增量修改：`AppHeader`移除返回和品牌跳转，将退出收进账号入口，并去掉强制包裹整行的sticky玻璃容器。新增`ThoughtNavigation`：桌面端左侧常驻“写新想法”和可分页的“以前写过的”；移动端在主区上方常驻“写新想法”“以前的想法”两个动作，后者打开可关闭的视口级面板。导航在文档流中占据空间，滚动时吸附在视口上沿，不覆盖输入。当前想法只在主区显示轻量状态，历史列表用第一段原文摘录并通过现有`GET /api/thoughts?cursor=`加载更多。`CapturePage`使用稳定`key="new-thought"`，确保从详情进入首页时卸载旧工作区状态，而不只是改变URL。
+- 受影响符号：`AppHeader`、`ThoughtWorkspace`、`ThoughtNavigation`、`GET /api/thoughts`
+- 验证入口：在320、375、768、1024和1440像素视口分别从空白页、短想法和长想法找到两个导航动作；从详情点击“写新想法”后断言输入区为空；创建二十一条以上想法后加载更多并打开末页内容；断网保存后立即新建，再联网回读原内容。
+- 边界与不变约束：不新增标题、标签、文件夹、搜索页或独立历史路由；“以前的想法”只展示当前账号数据，复用现有服务端所有权校验。
+
+#### 用页面状态表达产品定位
+
+- 需求/验收：首次用户不调用AI也能完成记录、回看和另起想法，并将产品理解为承接和继续想法而非聊天。
+- 实现目标：`retniw-v2`，用空白、已有内容和工具层级说明内容会去哪里。
+- 现状逻辑与代码证据：旧[`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer)在空白页和已有过程都显示同一句占位；旧`AiActions`把`advance/question/organize`与关系检查平铺为四个按钮；AI提示词和接口校验还强制输出“可以继续写：”，把内部动作直接暴露成产品语言。
+- 增量修改：空白页只显示“写下一个念头，之后可以随时回来接着想。”输入提示分别为“写下现在想到的”和“继续写这个想法”。有用户内容后，正文旁只渲染[`ThinkingAssist`](src/components/thoughts/thinking-assist.tsx#ThinkingAssist)的“帮我接着想”；[`ThoughtMenu`](src/components/thoughts/thought-menu.tsx#ThoughtMenu)收纳整理、导入和导出；找联系位于旧想法区域。`advance`提示词只返回一个最有用的问题或角度，不添加标题；[`aiOutputForDisplay`](src/lib/ai-output.ts#aiOutputForDisplay)清理旧数据的指令式前缀。普通内容仍按时间顺序平面展示，不使用聊天气泡。
+- 受影响符号：`ThoughtWorkspace`、`ThoughtComposer`、`ThinkingAssist`、`ThoughtMenu`、`EntryContent`、`aiOutputForDisplay`
+- 验证入口：全新账号完成首次保存、打开以前的想法、另起想法和回到原想法；断言空白页不存在AI操作按钮或自动模型请求。
+
 #### 稳定的思考工作区
 
 - 需求/验收：一句话保存后留在原处；至少可连续追加三段；AI 输出后仍可继续写；桌面与手机使用同一套功能。
 - 实现目标：`retniw-v2`，把首页和详情改成同一个持续可写的工作区。
-- 现状逻辑与代码证据：[`CaptureComposer.handleSubmit`](src/components/capture/capture-composer.tsx#handleSubmit)保存后执行`router.push('/fragments/...')`；[`FragmentTimeline`](src/components/fragments/fragment-timeline.tsx#FragmentTimeline)依次自动请求 Clarify 和 Reconnect，末尾只提供“继续记录”返回首页。当前状态机把单条碎片当成流程终点。
-- 增量修改：新增`ThoughtWorkspace`作为首页和`/thoughts/[id]`的共同主体。第一次保存后，本地状态从空白输入切换为当前过程，不卸载输入区；后续每次 Enter 都追加一条 entry。宽屏左侧显示过程，右侧显示最近过程、来源和关系；900px 以下改为单列。访问旧`/fragments/[id]`时按同一标识重定向到`/thoughts/[id]`。
-- 受影响符号：`CaptureComposer`、`FragmentTimeline`、`RecentFragments`、`CapturePage`、`FragmentDetailPage`、`ThoughtWorkspace`、`ThoughtPage`
+- 现状逻辑与代码证据：[`ThoughtWorkspace.handleSubmit`](src/components/thoughts/thought-workspace.tsx#handleSubmit)已经在第一次保存时用本地状态切换为当前过程，并在同步成功后无刷新替换URL；[`CapturePage`](app/page.tsx#CapturePage)和详情路由复用同一`ThoughtWorkspace`，旧fragment路由继续重定向到同ID thought。
+- 增量修改：保留第一次保存后不卸载输入区、后续每次Enter追加entry和旧链接兼容；本轮只把最近过程区域改造成统一导航，不能退回单条碎片流程或保存后路由跳转。
+- 受影响符号：`ThoughtWorkspace`、`CapturePage`、`ThoughtPage`、`FragmentDetailPage`
 - 验证入口：从空白首页连续保存三段，断言同步期间输入区不卸载、页面无空白；在手机和桌面断点打开同一过程，断言内容和操作一致。
 - 边界与不变约束：不新增聊天会话、标题、文件夹、标签或步骤向导；一段内容仍可单独构成完整过程。
 
@@ -82,8 +107,8 @@ flowchart TD
 
 - 需求/验收：Enter 保存，Shift+Enter 换行，中文输入法选词不提交；支持粘贴导入和`.md`、`.txt`文件；来源可识别。
 - 实现目标：`retniw-v2`，让直接输入和外部文本进入同一工作区，同时保留来源。
-- 现状逻辑与代码证据：[`CaptureComposer`](src/components/capture/capture-composer.tsx#CaptureComposer)已有 Enter、Shift+Enter 和`isComposing`判断，但只创建`inputMode: text`碎片；当前没有文件读取和来源字段。
-- 增量修改：保留现有键盘判定。新增`ImportTextDialog`，用户选择加入当前过程或新过程；文件在浏览器用`File.text()`读取，前端先检查扩展名、非空和不超过1,000,000字节，服务端再校验正文。文件来源名固定为文件名；粘贴来源名可空。导入正文作为一条`entryType=import`的 entry，不自动拆分或调用 AI。
+- 现状逻辑与代码证据：[`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer)已有Enter、Shift+Enter和`isComposing`判断；[`ImportTextDialog`](src/components/thoughts/import-text-dialog.tsx#ImportTextDialog)已支持浏览器读取文件、来源和导入目标，导入正文作为一条`entryType=import`的entry。
+- 增量修改：保留键盘判定、文件限制、来源和原文不拆分规则；只把界面中的“当前过程/新过程”改成“当前想法/新想法”，普通导入仍不自动调用AI。
 - 受影响符号：`ThoughtComposer`、`ImportTextDialog`、`parseImportedText`、`POST /api/thoughts`、`POST /api/thoughts/[id]/entries`
 - 验证入口：导入含中文、换行和常见标点的 md/txt；断言正文逐字一致、文件名可见；不支持格式、空文件和超限文件不创建 entry。
 
@@ -91,9 +116,9 @@ flowchart TD
 
 - 需求/验收：普通输入不自动回复；用户主动调用后100毫秒内有状态；逐步显示内容；失败不锁住输入。
 - 实现目标：`retniw-v2`，把 AI 从固定流程改为工作区中的显式工具。
-- 现状逻辑与代码证据：[`FragmentTimeline`](src/components/fragments/fragment-timeline.tsx#FragmentTimeline)在详情加载后自动调用 Clarify；[`DeepSeekTextProvider.complete`](src/server/ai/deepseek-text-provider.ts#complete)固定`stream:false`并等待完整 JSON 后返回。
-- 增量修改：工作区提供“推进”“追问”“整理”“寻找联系”。前三项调用`POST /api/thoughts/[id]/ai`，点击时立即创建独立的本地 AI 状态，读取服务端 SSE 并逐段显示；服务端完成后返回已持久化 entry 标识，客户端把临时内容替换为已同步内容。“寻找联系”只启动关系检查。AI 请求进行时输入框、复制和导出仍可用；中断的部分输出标记为未保存，不混入正式过程。
-- 受影响符号：`AiActions`、`StreamingAiEntry`、`useAiAction`、`DeepSeekTextProvider.streamText`、`POST /api/thoughts/[id]/ai`
+- 现状逻辑与代码证据：旧`AiActions`把`advance/question/organize`和关系检查平铺为四项操作；[`useAiAction.run`](src/hooks/use-ai-action.ts#run)与[`DeepSeekTextProvider.streamText`](src/server/ai/deepseek-text-provider.ts#streamText)已经按SSE逐段返回，但UI要求用户先理解模型策略差异，`advance`还被服务端强制加“可以继续写：”前缀。
+- 增量修改：[`ThinkingAssist`](src/components/thoughts/thinking-assist.tsx#ThinkingAssist)只向用户提供“帮我接着想”，调用现有`advance`动作；服务端自行选择问一个具体问题或指出一个角度，只返回一到两句且不加标题。整理保留`organize`动作，但只出现在[`ThoughtMenu`](src/components/thoughts/thought-menu.tsx#ThoughtMenu)；`question`接口为旧客户端兼容保留，不再单独出现在界面。找联系只在旧想法区域启动关系检查。点击AI操作时立即创建本地状态并读取SSE；完成后保存为AI entry，中断内容标记为未保存，不混入正式过程。
+- 受影响符号：`ThinkingAssist`、`ThoughtMenu`、`StreamingAiEntry`、`useAiAction`、`aiOutputForDisplay`、`DeepSeekTextProvider.streamText`、`POST /api/thoughts/[id]/ai`
 - 验证入口：普通保存时断言没有 DeepSeek 请求；逐块模拟 SSE，断言首块立刻可见；供应商超时、断流和非法响应时，原有 entries 不变且输入仍可提交。
 - 边界与不变约束：AI 不自动续聊、不替用户决定下一步、不覆盖用户或导入原文。
 
@@ -153,18 +178,18 @@ flowchart TD
 
 #### 关系检查与决策
 
-- 需求/验收：关系检查不阻塞输入；一次最多一个候选；候选未经确认不成为长期关系；否定后不重复提出同一对。
+- 需求/验收：关系检查仅由用户主动触发且不阻塞输入；一次最多一个候选；候选未经确认不成为长期关系；否定后不重复提出同一对。
 - 实现目标：`retniw-v2`，关系建立在思考过程之间，并保留两端具体内容段作为依据。
-- 现状逻辑与代码证据：[`Connection`](src/server/repositories/fragment-detail-repository.ts#Connection)只表达 fragment 对；[`FragmentTimeline`](src/components/fragments/fragment-timeline.tsx#FragmentTimeline)必须回答或跳过问题后才请求 Reconnect，关系状态与固定澄清流程互相阻塞。
-- 增量修改：每次用户或导入 entry 同步后，客户端独立请求`POST /api/thoughts/[id]/relations/check`；若页面提前关闭，详情加载时发现`relation_checked_at < last_activity_at`则补发。服务端读取当前过程和同用户最近20个其他过程，DeepSeek JSON Output最多返回一个候选及两端依据 entry。`thought_connections`按 thought ID 规范化并唯一；已有 pending 返回原候选，confirmed/rejected均不复活，并发唯一冲突后重读。完成或无候选都更新`relation_checked_at`。
+- 现状逻辑与代码证据：关系检查已是独立请求，但入口与三项AI正文操作平铺；服务端把AI entry也发送给`findConnection`，导致模型可能把自己的旧输出当作用户想法重新连接。[`ThoughtConnectionRepository`](src/server/repositories/thought-connection-repository.ts#ThoughtConnectionRepository)已经保证候选归一化、一次决定和拒绝后不复活。
+- 增量修改：关系入口只放在“以前的想法”区域。用户点击“找找旧想法的联系”后，客户端请求`POST /api/thoughts/[id]/relations/check`。服务端只保留当前过程和最近20个其他过程中的`user`或`import` entries，再交给DeepSeek最多返回一个候选及两端依据。已有指向AI entry的pending候选先标为rejected；新候选页面只并列显示“现在”和“以前”两段原文，不展示模型内部候选分析。`thought_connections`继续按 thought ID 规范化并唯一；confirmed/rejected不复活，并发唯一冲突后重读。
 - 受影响符号：`DeepSeekTextProvider.findConnection`、`ThoughtConnectionRepository`、`POST /api/thoughts/[id]/relations/check`、`PATCH /api/thought-connections/[id]`
-- 验证入口：覆盖单过程、无候选、非法目标、并发检查、已有三种状态、离开后补发和跨用户访问；断言输入接口不等待关系结果，否定关系不再出现。
+- 验证入口：覆盖普通保存、导入和详情回看均不自动检查；主动检查时覆盖单过程、无候选、非法目标、并发、已有三种状态和跨用户访问；断言输入接口不等待关系结果，否定关系不再出现。
 
 #### 导入、导出和数据边界
 
 - 需求/验收：外部文本原样进入；过程和全量数据可离开；导出不经过 AI。
 - 实现目标：`retniw-v2`，限制输入体积，分批读取数据库并流式输出。
-- 现状逻辑与代码证据：[`CaptureComposer`](src/components/capture/capture-composer.tsx#CaptureComposer)把输入限制为10,000字符；[`FragmentRecord`](src/server/repositories/fragment-repository.ts#FragmentRecord)没有来源字段，也没有导出契约。
+- 现状逻辑与代码证据：[`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer)把直接输入限制为10,000字符；[`ThoughtExportRepository`](src/server/repositories/thought-export-repository.ts#ThoughtExportRepository)已按thought、entry和confirmed connection提供分页读取。
 - 增量修改：直接输入仍限制10,000字符；单次导入限制1,000,000字节且 entry 正文最多1,000,000字符。Markdown导出按`created_at,id`排序写出过程元数据和 entries；全量JSON按500行分页读取 thoughts、entries和 confirmed connections，边读边写，不调用模型、不创建导出记录。
 - 受影响符号：`parseEntryInput`、`ThoughtExportRepository`、`GET /api/thoughts/[id]/export.md`、`GET /api/export`
 - 验证入口：分别测试边界值、超限、中文多字节、超出单次响应大小的全量导出和客户端中断；断言原数据不变且输出可重新解析。
@@ -292,8 +317,8 @@ alter table public.thought_connections enable row level security;
 
 | 契约 | 内容 | 约束 |
 | --- | --- | --- |
-| `/` | 空白输入、当前过程和最近过程 | 保存后不跳离工作区 |
-| `/thoughts/[id]` | 指定思考过程 | 只返回当前用户资源 |
+| `/` | 空白输入、“写新想法”和“以前的想法” | 使用`key="new-thought"`隔离详情状态；保存后不跳离工作区 |
+| `/thoughts/[id]` | 当前想法正文、“写新想法”和“以前的想法” | 只返回当前用户资源；返回和品牌不承担切换语义 |
 | `/fragments/[id]` | 旧链接兼容 | 重定向到同 ID 的 thought |
 | `/offline` | 离线冷启动 | 不缓存个人页面；恢复网络后读取 IndexedDB |
 | `thought_outbox` | IndexedDB 待同步 entries | 成功后逐条删除，不冒充服务端已同步 |
@@ -331,8 +356,8 @@ Markdown按 entry 顺序输出正文，并在每段前写入时间、作者类�
 ### DeepSeek 边界
 
 - 只在服务端读取`DEEPSEEK_API_KEY`和模型名，继续使用`deepseek-v4-flash`非思考模式。
-- “推进”“追问”“整理”发送当前过程内完成本次操作需要的 entries；上限500,000字符，超限明确失败，不静默丢上下文。
-- 关系检查发送当前过程和最近20个候选过程的必要原文；模型只能在服务端给定候选中选择。
+- “帮我接着想”和“整理这个想法”只发送当前想法中完成本次操作需要的 entries；兼容接口中的`question`不再作为独立页面入口。上下文上限500,000字符，超限明确失败，不静默丢内容。
+- 关系检查只发送当前想法和最近20个旧想法中的用户原文与导入内容；模型不能选择AI entry，也只能在服务端给定候选中选择。
 - 不发送邮箱、Supabase用户标识、文件本体、导出数据或身份凭据；日志只记请求标识、动作、耗时、状态码和字节数。
 - 不自动切换供应商；失败后由用户重试或继续写。
 
@@ -343,6 +368,7 @@ Markdown按 entry 顺序输出正文，并在每段前写入时间、作者类�
 - Supabase服务角色绕过 RLS。所有 repository 方法必须显式接收`userId`并加过滤；禁止暴露不带所有权条件的产品查询。
 - 浏览器读取文件后只发送文本和来源名。文件原始二进制不进入 Supabase、Vercel文件系统或对象存储。
 - AI SSE 完成前的部分输出不算正式内容。断流时页面标为未保存，不能把半段输出混入导出。
+- 工作区导航不会等待同步。离开当前路由时未同步entry必须继续保留在`thought_outbox`，重新进入对应想法或恢复网络后仍按原顺序重试。
 - `last_activity_at`在 entry 写入后更新；若更新失败，接口返回可重试错误，重复请求先找到既有 entry 再补更新时间。
 - Service Worker继续只缓存版本化静态资源和`/offline`；`/api`、带 Cookie 页面和导出响应不写 Cache Storage。
 - 1,000,000字节单文件限制低于 Vercel 4.5 MB请求体上限并给 JSON 编码留余量；以后支持更大文件时改为分片或专用存储。
@@ -355,22 +381,25 @@ Markdown按 entry 顺序输出正文，并在每段前写入时间、作者类�
 | 一句话保存后留在原处；至少可连续追加三段；AI 输出后仍可继续写；桌面与手机使用同一套功能。 | `retniw-v2`稳定工作区 | 浏览器连续追加三段并刷新回读，AI结束后再追加 | Chrome桌面与移动模拟、真实Supabase |
 | 输入下一帧可见；断网和刷新不丢；同步失败可重试；失败状态不能伪装成已同步。 | 本地乐观entry、`thought_outbox`和独立同步状态 | 离线三段、刷新、联网重试并核对状态 | IndexedDB与真实API |
 | Enter 保存，Shift+Enter 换行，中文输入法选词不提交；支持粘贴导入和`.md`、`.txt`文件；来源可识别。 | `ThoughtComposer`、`ImportTextDialog` | 中文输入法和键盘测试；导入中文、换行、边界和错误格式 | 浏览器与数据库比对 |
-| 普通输入不自动回复；用户主动调用后100毫秒内有状态；逐步显示内容；失败不锁住输入。 | 显式`AiActions`、本地start状态和SSE | 监听普通保存网络；延迟首块、逐块返回、503后继续输入 | Vitest流模拟、浏览器 |
+| 普通输入不自动回复；用户主动调用后100毫秒内有状态；逐步显示内容；失败不锁住输入。 | `ThinkingAssist`、本地start状态和SSE | 监听普通保存网络；延迟首块、逐块返回、503后继续输入 | Vitest流模拟、浏览器 |
 | 切换时先显示内容或骨架，不出现整页空白；返回同一过程后恢复阅读和输入位置。 | 缓存内容、`ThoughtSkeleton`和`useThoughtPosition` | 慢速网络切换，离开后返回 | Chrome网络限速 |
 | 复制单段不带界面文字；导出完整过程 Markdown；导出全部内容和已确认关系的结构化数据。 | Clipboard、流式Markdown和`retniw.export.v1` | 逐字比对复制；下载后离线解析两类导出 | Chrome、Node解析脚本 |
 | 短内容和连续内容使用同一结构；用户、导入和 AI 内容分别保存；最近记录按过程归组。 | `thoughts + entries`和entry类型 | 单段与多段写入后查询最近列表和详情 | 真实Supabase |
 | 个人内容仅本人可访问，服务角色和模型密钥不进入浏览器。 | RLS无客户端策略、服务端userId过滤 | 匿名、普通客户端、第二账号访问并扫描浏览器包 | 自动测试、真实Supabase |
 | 主动调用时流式显示；AI输出单独保存；模型失败不影响用户内容。 | `DeepSeekTextProvider.streamText`和AI entry | SSE成功、超时、断流、非法输出 | Vitest、真实DeepSeek |
-| 关系检查不阻塞输入；一次最多一个候选；候选未经确认不成为长期关系；否定后不重复提出同一对。 | 独立关系接口、唯一约束和状态分支 | 并发检查、持续输入、rejected后重复检查 | Vitest、真实Supabase |
+| 关系检查仅由用户主动触发且不阻塞输入；一次最多一个候选；候选未经确认不成为长期关系；否定后不重复提出同一对。 | 独立关系接口、唯一约束和状态分支 | 普通保存无模型调用；主动并发检查、持续输入、rejected后重复检查 | Vitest、真实Supabase |
 | 外部文本原样进入；过程和全量数据可离开；导出不经过 AI。 | import entry和服务端流式导出 | 原文比对；超过4.5MB时导出并确认没有模型请求 | Vercel预览、真实Supabase |
 | 现有用户内容不清空，旧链接可继续打开，新代码不继续产生旧结构数据。 | 幂等迁移、旧链接重定向和旧写入口停用 | 迁移前后逐项核对，脚本重复执行，保存新内容后查旧表 | Supabase快照、迁移报告 |
+| 未听过产品介绍的用户能在5秒内找到新想法和已有想法；手机与Mac入口含义一致，不依靠返回箭头或品牌标识切换。 | 统一工作区导航 | 跨320至1440像素视口检查“写新想法”和“以前的想法”；从详情新建后输入区必须为空；超过20条后加载更多 | Chromium、真实账号 |
+| 首次用户不调用AI也能完成记录、回看和另起想法，并将产品理解为承接和继续想法而非聊天。 | `retniw-v2`状态文案和次级AI入口 | 全新账号完成无AI闭环；检查空白页无AI操作和自动模型请求 | 浏览器网络面板、首次用户脚本 |
+| AI只在用户主动需要时介入，不要求用户理解模型策略。 | 分层的`ThinkingAssist`、`ThoughtMenu`和手动关系检查 | 普通保存、导入和详情回看无DeepSeek请求；“帮我接着想”无指令式前缀；整理与找联系位于各自上下文；关系输入无AI entry | Vitest、真实DeepSeek、Playwright |
 
 实现完成后统一运行`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`，再执行真实Supabase迁移核对、DeepSeek流式调用、桌面与手机浏览器验收。性能记录以用户点击时刻、状态出现时刻和首个可读 SSE 片段时刻计算，不把测试 Mock 当作3秒目标证据。
 
 ## 设计假设
 
 - 当前真实旧数据需要保留；选择非破坏迁移，不把“项目仍在早期”解释为可以清空用户内容。
-- 首版只有项目所有者使用，不增加多成员、共享和权限角色。
+- 当前是多个独立内测账号，不增加多成员、共享和权限角色；所有想法列表继续以现有账号所有权条件隔离。
 - 直接输入沿用当前10,000字符上限；文件导入放宽到1,000,000字节，以支持普通长文本同时远低于平台请求体限制。
 - 最近关系候选沿用当前20个对象的范围；首版不为提高召回率增加向量或图系统。
 - 同一设备恢复精确滚动和光标位置；跨设备恢复内容、顺序和可继续输入状态，不同步像素级滚动位置。

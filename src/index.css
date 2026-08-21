@@ -6,9 +6,6 @@
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --glass-border: rgb(255 255 255 / 14%);
-  --glass-highlight: rgb(255 255 255 / 9%);
-  --glass-fill: rgb(18 22 25 / 66%);
   --accent: #bfd8d0;
 }
 
@@ -68,30 +65,19 @@ a {
 }
 
 .app-header {
-  position: sticky;
-  z-index: 20;
-  top: 14px;
   display: grid;
-  grid-template-columns: minmax(52px, 1fr) auto minmax(52px, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  height: 60px;
-  margin-top: 14px;
-  padding: 0 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: 22px;
-  background: linear-gradient(135deg, var(--glass-highlight), transparent 44%), var(--glass-fill);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%), 0 18px 50px rgb(0 0 0 / 24%);
-  backdrop-filter: blur(26px) saturate(145%);
-  -webkit-backdrop-filter: blur(26px) saturate(145%);
+  height: 48px;
+  padding-top: 20px;
 }
 
 .brand {
   display: inline-flex;
-  justify-self: center;
+  justify-self: start;
   align-items: center;
   gap: 8px;
   color: #f5f5f3;
-  text-decoration: none;
 }
 
 .brand span {
@@ -108,43 +94,60 @@ a {
   object-fit: contain;
 }
 
-.header-anchor {
-  width: 36px;
-}
-
-.logout-form {
+.account-menu {
+  position: relative;
   justify-self: end;
+  color: rgb(245 245 243 / 52%);
+  font-size: 12px;
 }
 
-.logout-form button {
-  min-width: 44px;
-  padding: 6px 8px;
-  border: 0;
-  background: transparent;
-  color: rgb(245 245 243 / 38%);
-  font-size: 11px;
-  white-space: nowrap;
+.account-menu summary {
+  padding: 8px 10px;
+  border-radius: 999px;
   cursor: pointer;
-  transition: color 140ms ease;
+  list-style: none;
 }
 
-.logout-form button:hover {
-  color: rgb(245 245 243 / 72%);
+.account-menu summary::-webkit-details-marker {
+  display: none;
 }
 
-.back-link {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
+.account-menu summary:hover,
+.account-menu[open] summary {
+  background: rgb(255 255 255 / 7%);
+  color: rgb(245 245 243 / 78%);
+}
+
+.account-menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 132px;
+  padding: 6px;
   border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 50%;
-  color: #e7e7e4;
-  background: rgb(255 255 255 / 6%);
-  text-decoration: none;
+  border-radius: 13px;
+  background: rgb(17 20 23 / 94%);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 40%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
-.back-link svg,
+.account-menu__panel button {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgb(245 245 243 / 68%);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu__panel button:hover {
+  background: rgb(255 255 255 / 7%);
+  color: #f5f5f3;
+}
+
 .fragment-card svg,
 .capture-actions button svg {
   width: 19px;
@@ -358,33 +361,136 @@ a.fragment-card:hover {
 
 .thought-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-  gap: clamp(64px, 9vw, 140px);
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+  gap: clamp(48px, 7vw, 104px);
   align-items: start;
-  padding-top: clamp(46px, 7vh, 82px);
+  padding-top: clamp(38px, 6vh, 72px);
 }
 
 .thought-main {
   width: 100%;
   min-width: 0;
-  max-width: 100%;
+  max-width: 820px;
 }
 
-.thought-tools,
 .export-menu {
   min-width: 0;
   display: flex;
+  flex-direction: column;
+}
+
+.workspace-heading {
+  display: flex;
+  min-height: 54px;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
 }
 
-.thought-tools {
-  min-height: 32px;
-  margin-bottom: 26px;
+.workspace-kicker {
+  margin: 0;
+  color: rgb(245 245 243 / 46%);
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.04em;
 }
 
-.thought-tools > button,
-.export-menu a,
+.workspace-heading h1 {
+  max-width: 620px;
+  margin: 0;
+  color: rgb(245 245 243 / 86%);
+  font-size: clamp(20px, 2.35vw, 28px);
+  font-weight: 510;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+
+.thought-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.thought-menu > summary {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(245 245 243 / 42%);
+  cursor: pointer;
+  list-style: none;
+}
+
+.thought-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.thought-menu > summary:hover,
+.thought-menu[open] > summary {
+  background: rgb(255 255 255 / 6%);
+  color: rgb(245 245 243 / 72%);
+}
+
+.thought-menu > summary svg {
+  width: 19px;
+  fill: currentColor;
+}
+
+.thought-menu__panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: 190px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 13px;
+  background: rgb(17 20 23 / 96%);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 40%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.thought-menu__panel button,
+.thought-menu__panel a {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgb(245 245 243 / 66%);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.thought-menu__panel button:hover:not(:disabled),
+.thought-menu__panel a:hover {
+  background: rgb(255 255 255 / 7%);
+  color: rgb(245 245 243 / 88%);
+}
+
+.thought-menu__panel button:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
+.thought-menu__panel .export-menu {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.thought-menu__panel .export-menu span {
+  padding: 6px 10px;
+  color: rgb(245 245 243 / 34%);
+  font-size: 11px;
+}
+
 .entry-copy {
   padding: 0;
   border: 0;
@@ -396,25 +502,188 @@ a.fragment-card:hover {
   cursor: pointer;
 }
 
-.export-menu span {
-  color: rgb(245 245 243 / 30%);
+.thought-sidebar {
+  position: sticky;
+  top: 24px;
+  min-width: 0;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 10%) transparent;
+}
+
+.new-thought-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 11px 12px;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 14px;
+  color: rgb(245 245 243 / 78%);
+  text-decoration: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.new-thought-action:hover {
+  border-color: rgb(191 216 208 / 26%);
+  background: rgb(191 216 208 / 5%);
+}
+
+.new-thought-action > svg {
+  width: 22px;
+  flex: 0 0 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.55;
+  color: var(--accent);
+}
+
+.new-thought-action span {
+  display: grid;
+  gap: 3px;
+}
+
+.new-thought-action strong {
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.new-thought-action small {
+  color: rgb(245 245 243 / 34%);
   font-size: 11px;
 }
 
-.thought-tools > button,
-.export-menu a {
-  padding: 7px 11px;
-  border: 1px solid rgb(255 255 255 / 9%);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 4%);
-  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+.all-thoughts {
+  padding-top: 30px;
 }
 
-.thought-tools > button:hover,
-.export-menu a:hover {
-  border-color: rgb(255 255 255 / 16%);
-  background: rgb(255 255 255 / 7%);
+.all-thoughts h2,
+.thought-history-dialog h2 {
+  margin: 0 0 13px;
+  color: rgb(245 245 243 / 42%);
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: 0.04em;
+}
+
+.thought-list-empty,
+.thought-list-error {
+  margin: 10px 3px;
+  color: rgb(245 245 243 / 35%);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.thought-list-error {
+  color: #d5a09a;
+}
+
+.load-more-thoughts {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 11px;
+  background: transparent;
+  color: rgb(245 245 243 / 48%);
+  cursor: pointer;
+}
+
+.load-more-thoughts:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.relation-entry {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 10px 4px;
+  border: 0;
+  background: transparent;
+  color: rgb(245 245 243 / 40%);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.relation-entry:hover {
+  color: rgb(245 245 243 / 68%);
+}
+
+.relation-entry:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.relation-entry svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.mobile-workspace-nav {
+  display: none;
+}
+
+.thought-history-dialog {
+  position: fixed;
+  inset: auto 0 0;
+  width: min(100%, 680px);
+  min-width: 0;
+  max-width: none;
+  max-height: min(78dvh, 760px);
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  background: rgb(14 17 19 / 96%);
+  color: #f2f2ef;
+  box-shadow: 0 -24px 70px rgb(0 0 0 / 48%);
+}
+
+.thought-history-dialog::backdrop {
+  background: rgb(0 0 0 / 62%);
+  backdrop-filter: blur(6px);
+}
+
+.thought-history-dialog__header {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.thought-history-dialog__header h2 {
+  margin: 0;
   color: rgb(245 245 243 / 75%);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.thought-history-dialog__header button {
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: rgb(245 245 243 / 50%);
+  cursor: pointer;
+}
+
+.thought-history-dialog__body {
+  max-height: calc(min(78dvh, 760px) - 58px);
+  padding: 12px 14px calc(22px + env(safe-area-inset-bottom));
+  overflow-y: auto;
 }
 
 .thought-entries {
@@ -677,6 +946,27 @@ a.fragment-card:hover {
   font-size: 12px;
 }
 
+.entry-source--assist {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.entry-source--assist svg {
+  width: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.thought-entry--assist {
+  margin-left: 26px;
+  padding-left: 17px;
+  border-left: 1px solid rgb(191 216 208 / 16%);
+}
+
 .thought-composer textarea {
   min-height: 190px;
 }
@@ -705,26 +995,54 @@ a.fragment-card:hover {
   cursor: pointer;
 }
 
-.ai-action-area {
-  margin-top: 18px;
-}
-
-.ai-actions {
-  width: max-content;
-  max-width: 100%;
+.thinking-assist {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgb(255 255 255 / 7%), transparent 46%), rgb(18 22 25 / 62%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%), 0 12px 34px rgb(0 0 0 / 18%);
-  backdrop-filter: blur(22px) saturate(135%);
-  -webkit-backdrop-filter: blur(22px) saturate(135%);
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
 }
 
-.ai-actions button,
+.thinking-assist button {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px 8px 11px;
+  border: 1px solid rgb(191 216 208 / 17%);
+  border-radius: 999px;
+  background: rgb(191 216 208 / 7%);
+  color: rgb(230 238 234 / 72%);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.thinking-assist button:hover:not(:disabled) {
+  border-color: rgb(191 216 208 / 30%);
+  background: rgb(191 216 208 / 11%);
+  color: rgb(238 244 241 / 92%);
+}
+
+.thinking-assist button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.thinking-assist svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.thinking-assist p {
+  margin: 0;
+  color: rgb(245 245 243 / 34%);
+  font-size: 12px;
+}
+
 .ai-unsaved button {
   padding: 8px 13px;
   border: 1px solid transparent;
@@ -732,23 +1050,6 @@ a.fragment-card:hover {
   background: transparent;
   color: rgb(245 245 243 / 56%);
   cursor: pointer;
-}
-
-.ai-actions button:disabled {
-  cursor: default;
-  opacity: 0.3;
-}
-
-.ai-actions button:not(:disabled):hover {
-  border-color: rgb(255 255 255 / 10%);
-  background: rgb(255 255 255 / 7%);
-  color: rgb(245 245 243 / 82%);
-}
-
-.ai-input-hint {
-  margin: 9px 7px 0;
-  color: rgb(245 245 243 / 34%);
-  font-size: 12px;
 }
 
 .thought-entry--ai-live {
@@ -808,15 +1109,27 @@ a.fragment-card:hover {
   background: rgb(255 255 255 / 3%);
 }
 
-.relation-rationale {
-  margin: 0;
-  color: rgb(245 245 243 / 78%);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
+.relation-pair {
+  display: grid;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.relation-pair > div {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.relation-pair span {
+  padding-top: 12px;
+  color: rgb(245 245 243 / 30%);
+  font-size: 11px;
 }
 
 .relation-candidate blockquote {
-  margin: 13px 0 0;
+  margin: 0;
   padding: 12px 14px;
   border-left: 1px solid rgb(255 255 255 / 14%);
   color: rgb(245 245 243 / 48%);
@@ -1225,22 +1538,77 @@ a.fragment-card:hover {
   .app-shell {
     max-width: 732px;
     padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+    padding-bottom: calc(128px + env(safe-area-inset-bottom));
   }
 
   .capture-layout,
   .detail-layout,
   .thought-layout {
     grid-template-columns: 1fr;
-    gap: 56px;
-    padding-top: 48px;
+    gap: 0;
+    padding-top: 24px;
   }
 
   .capture-column {
     position: static;
   }
 
-  .thought-recent {
-    position: static;
+  .thought-main {
+    max-width: 100%;
+  }
+
+  .thought-sidebar {
+    display: none;
+  }
+
+  .mobile-workspace-nav {
+    position: sticky;
+    z-index: 40;
+    top: 8px;
+    display: flex;
+    width: min(340px, 100%);
+    min-height: 58px;
+    align-items: center;
+    margin: 0 auto 24px;
+    padding: 5px;
+    border: 1px solid rgb(255 255 255 / 13%);
+    border-radius: 18px;
+    background: rgb(16 19 21 / 96%);
+    box-shadow: 0 12px 34px rgb(0 0 0 / 30%);
+  }
+
+  .mobile-workspace-nav > a,
+  .mobile-workspace-nav > button {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 46px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 6px;
+    border: 0;
+    border-radius: 13px;
+    background: transparent;
+    color: rgb(245 245 243 / 54%);
+    font-size: 12px;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .mobile-workspace-nav svg {
+    width: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+  }
+
+  .mobile-workspace-nav > [aria-current="page"] {
+    background: rgb(255 255 255 / 8%);
+    color: rgb(245 245 243 / 90%);
   }
 
   .capture-surface textarea {
@@ -1253,22 +1621,20 @@ a.fragment-card:hover {
     max-width: none;
     padding-right: max(12px, env(safe-area-inset-right));
     padding-left: max(12px, env(safe-area-inset-left));
-    padding-bottom: 36px;
+    padding-bottom: calc(128px + env(safe-area-inset-bottom));
   }
 
   .app-header {
-    grid-template-columns: minmax(48px, 1fr) auto minmax(48px, 1fr);
-    top: 8px;
-    height: 54px;
-    margin-top: 8px;
-    border-radius: 18px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    height: 44px;
+    padding-top: 12px;
   }
 
   .capture-layout,
   .detail-layout,
   .thought-layout {
-    gap: 42px;
-    padding-top: 30px;
+    gap: 0;
+    padding-top: 20px;
   }
 
   .capture-surface,
@@ -1286,26 +1652,25 @@ a.fragment-card:hover {
     min-height: 150px;
   }
 
-  .thought-tools {
+  .workspace-heading {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .workspace-heading h1 {
+    font-size: 21px;
+  }
+
+  .thinking-assist {
     align-items: flex-start;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 8px;
   }
 
-  .ai-actions {
-    display: grid;
-    width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-radius: 18px;
-  }
-
-  .ai-actions button {
-    width: 100%;
-    min-width: 0;
-    padding-inline: 8px;
-  }
-
-  .export-menu {
-    flex-wrap: wrap;
+  .thought-entry--assist {
+    margin-left: 10px;
+    padding-left: 13px;
   }
 
   .import-dialog {
@@ -1334,8 +1699,9 @@ a.fragment-card:hover {
     font-size: 12px;
   }
 
-  .logout-form button {
-    font-size: 12px;
+  .thought-history-dialog {
+    width: 100%;
+    border-radius: 20px 20px 0 0;
   }
 
   .fragment-card {

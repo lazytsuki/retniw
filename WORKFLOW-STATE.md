@@ -1,7 +1,7 @@
 # WORKFLOW-STATE
 
-- current_stage: implementation_complete
-- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈"
+- current_stage: release
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
   - PRD.md
@@ -13,8 +13,12 @@
   - TASK-M-004-独立关系发现.md
   - TASK-M-005-开放导入导出.md
   - TASK-M-006-跨端可用性验收.md
+  - TASK-M-007-零说明书体验收口.md
+  - COMPETITIVE-BRIEF.md
   - CODE-REVIEW.md
   - 上线checkList.md
+  - CODE-REVIEW-M007.md
+  - 上线checkList-M007.md
   - archive/tasks-v1/
 - confirmed_decisions:
   - "首版选择 A：手机优先、Mac 可访问，并需要跨端同步"
@@ -77,6 +81,15 @@
   - "第二版已部署到 https://retniw.vercel.app：五个生产环境变量已注入，远程构建完成，登录、Enter保存、主动DeepSeek追问、退出和品牌资源均通过生产环境验证"
   - "Vercel项目已连接lazytsuki/retniw，并将GitHub默认分支配置为Production Branch；后续推送会自动更新正式域名，本机无需持续运行"
   - "跨端响应式底座补正：页面壳统一使用安全区内边距，双栏取消硬最小宽度，顶栏操作禁止拆字，移动端AI操作改为两列；首页、登录、导入弹层、详情长内容在Chromium与WebKit的320至1440像素视口均无横向溢出"
+  - "2026-08-21本轮需求分析已由用户确认：工作区固定提供新想法、所有想法和当前想法；首次使用由结构与空白状态说明定位；大陆内测先验证Vercel自定义域名，失败则沿用同一域名切换中国香港托管"
+  - "PRD V2.1已更新：纳入工作区导航、首次使用定位、大陆三网内测入口与失败切换口径，等待用户确认"
+  - "用户授权自主推进零说明书体验收口，不设置中途人工确认门禁；PRD V2.1按最新第一性原理补正为推进、追问、整理和寻找联系均由用户主动触发"
+  - "零说明书体验调研收口：桌面常驻侧栏、移动固定导航和所有想法面板；空白状态先说明内容结果，AI只在有内容后作为次级入口"
+  - "TECH-DESIGN.md已按当前代码更新并通过校验；M-007任务卡覆盖统一导航、首次状态、手动关系检查、所有想法分页、跨端验收和正式域名文档同步"
+  - "M-007信息架构收口为一条产品链路：写下一个念头、接着想、之后再回来；全局导航只保留写新想法和以前的想法，当前想法留在正文主区"
+  - "M-007主动AI收口为正文旁一个帮我接着想入口；整理进入更多操作，找联系进入旧想法区域，关系检查只使用用户原文和导入内容"
+  - "M-007交付前审查补正明确新建与断网草稿恢复的状态边界，并将会遮挡输入的移动底部浮层改为文档流内占位的常驻导航"
+  - "M-007本地交付门禁通过：13个测试文件、74个测试、类型检查、Lint、Next.js生产构建、依赖高危审计和diff检查均通过；Chromium在320、375、768、1024、1440像素无横向溢出"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -90,9 +103,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "继续首轮内测并收集真实使用反馈"
+- suggested_next_action: "提交并推送M-007，等待Vercel生产部署后在retniw.cn回放主链路与旧域名跳转"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
-- last_confirmed_stage: production_beta
+- last_confirmed_stage: code_review
 - confirmation_gate: ""
-- release_checklist: done
+- release_checklist: ready

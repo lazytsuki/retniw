@@ -38,7 +38,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <button type="submit">登录</button>
         </form>
         <p className="login-note">
-          每位体验者使用自己的账号。请勿记录工作机密；主动使用 AI 时，当前过程会交给 DeepSeek 处理。
+          每位体验者使用自己的账号。请勿记录工作机密；主动使用 AI 时，当前想法会交给 DeepSeek 处理。
         </p>
       </section>
     </main>

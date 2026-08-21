@@ -41,7 +41,7 @@ const entry = {
   thoughtId,
   clientRequestId: requestId,
   entryType: 'ai',
-  content: '可以继续写：往前',
+  content: '先回想一下，那种剥离感第一次出现时，你正在做什么？',
   sourceLabel: null,
   aiAction: 'advance',
   createdAt: '2026-08-20T10:00:00.000Z',
@@ -66,8 +66,8 @@ beforeEach(() => {
   mocks.touch.mockResolvedValue(undefined)
   mocks.createEntry.mockResolvedValue({ entry, created: true })
   mocks.streamText.mockImplementation(async function* () {
-    yield '可以继续写：'
-    yield '往前'
+    yield '先回想一下，那种剥离感第一次出现时，'
+    yield '你正在做什么？'
   })
 })
 
@@ -81,7 +81,25 @@ describe('thought AI stream route', () => {
     expect(stream.lastIndexOf('event: delta')).toBeLessThan(stream.indexOf('event: saved'))
     expect(mocks.createEntry).toHaveBeenCalledTimes(1)
     expect(mocks.createEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ content: '可以继续写：往前', entryType: 'ai', aiAction: 'advance' }),
+      expect.objectContaining({
+        content: '先回想一下，那种剥离感第一次出现时，你正在做什么？',
+        entryType: 'ai',
+        aiAction: 'advance',
+      }),
+    )
+  })
+
+  it('removes the legacy instruction-like prefix before saving', async () => {
+    mocks.streamText.mockImplementation(async function* () {
+      yield '可以继续写：'
+      yield '当时最先出现的念头是什么？'
+    })
+
+    const response = await POST(request(), { params: Promise.resolve({ id: thoughtId }) })
+    await response.text()
+
+    expect(mocks.createEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '当时最先出现的念头是什么？' }),
     )
   })
 

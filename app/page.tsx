@@ -17,15 +17,17 @@ export default async function CapturePage() {
     throw error
   }
 
-  const { thoughts } = await new ThoughtRepository(createServiceClient()).listRecent(userId)
+  const recent = await new ThoughtRepository(createServiceClient()).listRecent(userId)
 
   return (
     <main className="app-shell">
       <AppHeader />
       <ThoughtWorkspace
+        key="new-thought"
         initialThought={null}
         initialEntries={[]}
-        initialThoughts={thoughts}
+        initialThoughts={recent.thoughts}
+        initialNextCursor={recent.nextCursor}
         initialConnections={[]}
       />
     </main>

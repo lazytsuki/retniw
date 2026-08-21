@@ -69,6 +69,7 @@ beforeEach(() => {
       {
         id: thoughtId === currentId ? currentEntryId : targetEntryId,
         content: thoughtId === currentId ? '当前内容' : '候选内容',
+        entryType: 'user',
       },
     ],
     connections: [],
@@ -109,6 +110,39 @@ describe('thought relation check', () => {
     expect((await response.json()).data.connection.id).toBe(connection.id)
     expect(mocks.createCandidate).toHaveBeenCalledTimes(1)
     expect(mocks.markChecked).toHaveBeenCalledWith('owner', currentId)
+    expect(mocks.findConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ entries: [expect.objectContaining({ content: '当前内容' })] }),
+      [expect.objectContaining({ entries: [expect.objectContaining({ content: '候选内容' })] })],
+    )
+  })
+
+  it('never treats AI output as the user idea being reconnected', async () => {
+    mocks.getDetail.mockImplementation(async (_userId: string, thoughtId: string) => ({
+      thought: {
+        id: thoughtId,
+        relationCheckedAt: null,
+        lastActivityAt: '2026-08-20T10:00:00.000Z',
+      },
+      entries: thoughtId === currentId
+        ? [
+            { id: currentEntryId, content: '当前内容', entryType: 'user' },
+            { id: 'ai-current', content: 'AI 生成内容', entryType: 'ai' },
+          ]
+        : [
+            { id: targetEntryId, content: '候选内容', entryType: 'import' },
+            { id: 'ai-target', content: 'AI 候选内容', entryType: 'ai' },
+          ],
+      connections: [],
+    }))
+
+    await checkRelation(new Request('http://localhost'), {
+      params: Promise.resolve({ id: currentId }),
+    })
+
+    expect(mocks.findConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ entries: [{ id: currentEntryId, content: '当前内容' }] }),
+      [expect.objectContaining({ entries: [{ id: targetEntryId, content: '候选内容' }] })],
+    )
   })
 
   it('returns an existing pending candidate without invoking the model', async () => {
@@ -121,6 +155,23 @@ describe('thought relation check', () => {
     expect(response.status).toBe(200)
     expect(mocks.findConnection).not.toHaveBeenCalled()
     expect((await response.json()).data.connection.id).toBe(connection.id)
+  })
+
+  it('retires a legacy candidate that points to AI output', async () => {
+    mocks.pending.mockResolvedValue({
+      ...connection,
+      sourceEntry: { ...connection.sourceEntry, entryType: 'ai' },
+      targetEntry: { ...connection.targetEntry, entryType: 'user' },
+    })
+    mocks.decide.mockResolvedValue({ ...connection, status: 'rejected' })
+
+    const response = await checkRelation(new Request('http://localhost'), {
+      params: Promise.resolve({ id: currentId }),
+    })
+
+    expect(response.status).toBe(201)
+    expect(mocks.decide).toHaveBeenCalledWith('owner', connection.id, 'rejected')
+    expect(mocks.findConnection).toHaveBeenCalledTimes(1)
   })
 })
 

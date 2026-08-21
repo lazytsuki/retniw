@@ -12,13 +12,13 @@
 - 目标代码/产出物：
   - [x] 新增文件并修改前置任务符号：在 `retniw-v2` 更新 [ThoughtWorkspace](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)、[global styles](src/index.css#app-shell)和 [RootLayout](app/layout.tsx#RootLayout)。
   - [x] 新增文件并创建符号：在 `retniw-v2` 新增 [ThoughtSkeleton](src/components/thoughts/thought-skeleton.tsx#ThoughtSkeleton)、[useThoughtPosition](src/hooks/use-thought-position.ts#useThoughtPosition)和 [Thought loading](app/thoughts/%5Bid%5D/loading.tsx#ThoughtLoading)。
-  - [x] 修改现有文件并新增文件与测试符号：在 `retniw-v2` 复核 [Service Worker](public/sw.js#fetch)，并新增 [workspace acceptance tests](tests/ui/thought-workspace.test.ts#thought-workspace)与 [live verification](scripts/verify-retniw-v2-live.mjs#verifyRetniwV2Live)。
+  - [x] 修改现有文件并新增文件与测试符号：在 `retniw-v2` 复核 [Service Worker](public/sw.js#fetch)，并新增 [workspace acceptance tests](tests/ui/thought-workspace.test.ts#thought-workspace)与 [live verification](scripts/verify-retniw-v2-live.mjs#legacyCounts)。
 - 实现步骤：
   1. 从 `workspace` 入口进入 [ThoughtWorkspace](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)在手机保持打开即写和单手操作，在宽屏展示当前过程与辅助信息；两端不分叉功能。
   2. [ThoughtSkeleton](src/components/thoughts/thought-skeleton.tsx#ThoughtSkeleton)在无缓存初载时承接页面；已有本地内容时先显示内容，各异步区域只显示自身状态。
   3. [useThoughtPosition](src/hooks/use-thought-position.ts#useThoughtPosition)按 thought ID在同一设备恢复滚动和未提交输入；跨端共享服务端内容、顺序、来源和关系。
   4. [Service Worker](public/sw.js#fetch)继续只缓存静态资源与离线页；API、Cookie页面和流式导出均走网络。
-  5. [verifyRetniwV2Live](scripts/verify-retniw-v2-live.mjs#verifyRetniwV2Live)依次验证空白用户、旧数据用户、离线恢复、DeepSeek流、关系决定、导入导出和第二账号隔离。
+  5. [live verification](scripts/verify-retniw-v2-live.mjs#legacyCounts)依次验证空白用户、旧数据用户、离线恢复、DeepSeek流、关系决定、导入导出和第二账号隔离。
 - 边界与不变约束：
   - [x] 不得用全屏 loading 覆盖独立状态，不为了视觉效果增加新流程；不得缓存个人正文、API和导出。
   - [x] 3秒首段目标必须使用真实 DeepSeek和正常网络记录，不得用 Mock结果证明。
@@ -26,4 +26,4 @@
 - 完成定义：
   - [x] 自动检查、生产构建、真实 Supabase、真实 DeepSeek、手机和 Mac 全链路均通过；没有旧表新写入、越权、整页空白或输入阻塞。
 - 验证方式：
-  - [x] 入口：运行 npm run lint、npm run typecheck、npm test、npm run build，再执行 [verifyRetniwV2Live](scripts/verify-retniw-v2-live.mjs#verifyRetniwV2Live)和手机/Mac人工流程；被测：[ThoughtWorkspace](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)及全部公开入口；Mock：自动单测按模块边界 Mock，最终验收不 Mock Supabase和DeepSeek；断言：跨端同内容同顺序、局部加载、位置恢复、时延记录、离线恢复、RLS隔离、导出完整、旧表零新增。
+  - [x] 入口：运行 npm run lint、npm run typecheck、npm test、npm run build，再执行 [live verification](scripts/verify-retniw-v2-live.mjs#legacyCounts)和手机/Mac人工流程；被测：[ThoughtWorkspace](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)及全部公开入口；Mock：自动单测按模块边界 Mock，最终验收不 Mock Supabase和DeepSeek；断言：跨端同内容同顺序、局部加载、位置恢复、时延记录、离线恢复、RLS隔离、导出完整、旧表零新增。

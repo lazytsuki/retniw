@@ -130,7 +130,7 @@ export function ImportTextDialog({ open, currentAllowed, onClose, onImport }: Im
       )}
 
       <fieldset>
-        <legend>放到哪里</legend>
+        <legend>导入到</legend>
         <label>
           <input
             type="radio"
@@ -140,7 +140,7 @@ export function ImportTextDialog({ open, currentAllowed, onClose, onImport }: Im
             checked={target === 'current'}
             onChange={() => setTarget('current')}
           />
-          当前过程
+          当前想法
         </label>
         <label>
           <input
@@ -150,7 +150,7 @@ export function ImportTextDialog({ open, currentAllowed, onClose, onImport }: Im
             checked={target === 'new'}
             onChange={() => setTarget('new')}
           />
-          新过程
+          新想法
         </label>
       </fieldset>
 

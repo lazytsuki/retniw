@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { ApiError } from '@/src/lib/api-error'
 import { apiErrorResponse } from '@/src/lib/api-response'
 import { hasNewUserContext } from '@/src/lib/ai-context'
+import { aiOutputForDisplay } from '@/src/lib/ai-output'
 import { requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { DeepSeekTextProvider, type AiAction } from '@/src/server/ai/deepseek-text-provider'
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             controller.enqueue(encodeEvent(encoder, 'delta', { content: delta }))
           }
 
-          const completeContent = content.trim()
+          const completeContent = aiOutputForDisplay(content, action)
           if (!completeContent) {
             throw new ApiError(503, 'AI_UNAVAILABLE', 'AI returned an empty result', true)
           }
@@ -92,8 +93,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           ) {
             throw new ApiError(503, 'AI_UNAVAILABLE', 'AI did not return a valid question', true)
           }
-          if (action === 'advance' && !completeContent.startsWith('可以继续写：')) {
-            throw new ApiError(503, 'AI_UNAVAILABLE', 'AI did not return a valid direction', true)
+          if (
+            action === 'advance' &&
+            thoughtEntries.some((entry) => entry.content.trim() === completeContent)
+          ) {
+            throw new ApiError(503, 'AI_UNAVAILABLE', 'AI repeated the user input', true)
           }
           const result = await entries.createIdempotent({
             id: clientRequestId,

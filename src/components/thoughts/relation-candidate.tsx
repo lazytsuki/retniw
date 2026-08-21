@@ -2,6 +2,7 @@
 
 import type { RelationConnection } from '@/src/hooks/use-relation-check'
 import type { ThoughtConnectionDecision } from '@/src/server/repositories/thought-connection-repository'
+import { aiOutputForDisplay } from '@/src/lib/ai-output'
 
 type RelationCandidateProps = {
   currentThoughtId: string
@@ -38,13 +39,26 @@ export function RelationCandidate({
   const otherEntry = connection.sourceThoughtId === currentThoughtId
     ? connection.targetEntry
     : connection.sourceEntry
+  const currentContent = currentEntry
+    ? aiOutputForDisplay(currentEntry.content, currentEntry.aiAction)
+    : ''
+  const otherContent = otherEntry
+    ? aiOutputForDisplay(otherEntry.content, otherEntry.aiAction)
+    : ''
 
   return (
     <section className="relation-candidate" aria-labelledby={`relation-${connection.id}`}>
-      <p className="entry-source">可能的联系</p>
-      <p id={`relation-${connection.id}`} className="relation-rationale">{connection.rationale}</p>
-      <blockquote>{currentEntry?.content}</blockquote>
-      <blockquote>{otherEntry?.content}</blockquote>
+      <p id={`relation-${connection.id}`} className="entry-source">这段旧想法可能和现在有关</p>
+      <div className="relation-pair">
+        <div>
+          <span>现在</span>
+          <blockquote>{currentContent}</blockquote>
+        </div>
+        <div>
+          <span>以前</span>
+          <blockquote>{otherContent}</blockquote>
+        </div>
+      </div>
       {status === 'candidate' ? (
         <div className="relation-actions">
           <button type="button" onClick={() => onDecide('confirmed')}>保留联系</button>

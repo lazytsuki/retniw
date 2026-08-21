@@ -4,7 +4,7 @@ import { ThoughtSkeleton } from '@/src/components/thoughts/thought-skeleton'
 export default function ThoughtLoading() {
   return (
     <main className="app-shell">
-      <AppHeader back />
+      <AppHeader />
       <ThoughtSkeleton />
     </main>
   )

@@ -31,12 +31,13 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
 
   return (
     <main className="app-shell">
-      <AppHeader back />
+      <AppHeader />
       <ThoughtWorkspace
         key={data.thought.id}
         initialThought={data.thought}
         initialEntries={data.entries}
         initialThoughts={recent.thoughts}
+        initialNextCursor={recent.nextCursor}
         initialConnections={data.connections}
       />
     </main>

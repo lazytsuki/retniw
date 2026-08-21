@@ -11,6 +11,12 @@ export const maxDuration = 60
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+function userEntries(entries: Array<{ id: string; content: string; entryType: string }>) {
+  return entries
+    .filter((entry) => entry.entryType === 'user' || entry.entryType === 'import')
+    .map((entry) => ({ id: entry.id, content: entry.content }))
+}
+
 export async function POST(_request: Request, { params }: RouteContext) {
   try {
     const user = await requireUser()
@@ -21,8 +27,12 @@ export async function POST(_request: Request, { params }: RouteContext) {
     const current = await thoughts.getDetail(user.id, thoughtId)
     const pending = await connections.pendingForThought(user.id, thoughtId)
     if (pending) {
-      await connections.markChecked(user.id, thoughtId)
-      return NextResponse.json({ data: { connection: pending } })
+      const pointsToAi = pending.sourceEntry?.entryType === 'ai' || pending.targetEntry?.entryType === 'ai'
+      if (!pointsToAi) {
+        await connections.markChecked(user.id, thoughtId)
+        return NextResponse.json({ data: { connection: pending } })
+      }
+      await connections.decide(user.id, pending.id, 'rejected')
     }
     if (
       current.thought.relationCheckedAt &&
@@ -43,15 +53,23 @@ export async function POST(_request: Request, { params }: RouteContext) {
     const candidateDetails = await Promise.all(
       candidateThoughts.map((thought) => thoughts.getDetail(user.id, thought.id)),
     )
+    const currentUserEntries = userEntries(current.entries)
+    const candidatesWithUserEntries = candidateDetails
+      .map((detail) => ({
+        id: detail.thought.id,
+        entries: userEntries(detail.entries),
+      }))
+      .filter((thought) => thought.entries.length > 0)
+    if (!currentUserEntries.length || !candidatesWithUserEntries.length) {
+      await connections.markChecked(user.id, thoughtId)
+      return NextResponse.json({ data: { connection: null } })
+    }
     const suggestion = await new DeepSeekTextProvider().findConnection(
       {
         id: thoughtId,
-        entries: current.entries.map((entry) => ({ id: entry.id, content: entry.content })),
+        entries: currentUserEntries,
       },
-      candidateDetails.map((detail) => ({
-        id: detail.thought.id,
-        entries: detail.entries.map((entry) => ({ id: entry.id, content: entry.content })),
-      })),
+      candidatesWithUserEntries,
     )
     if (!suggestion) {
       await connections.markChecked(user.id, thoughtId)
