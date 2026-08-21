@@ -4,12 +4,12 @@ import { shouldSubmitThought, thoughtComposerCopy } from '@/src/components/thoug
 describe('thought composer keyboard behavior', () => {
   it('uses different copy for a new idea and the current idea', () => {
     expect(thoughtComposerCopy(false)).toEqual({
-      ariaLabel: '写下现在想到的',
-      placeholder: '写下现在想到的',
+      ariaLabel: '写在这里',
+      placeholder: '写在这里',
     })
     expect(thoughtComposerCopy(true)).toEqual({
-      ariaLabel: '继续写这个想法',
-      placeholder: '继续写这个想法',
+      ariaLabel: '接着写',
+      placeholder: '接着写',
     })
   })
 

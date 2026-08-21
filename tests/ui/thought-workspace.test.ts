@@ -3,8 +3,28 @@ import { describe, expect, it } from 'vitest'
 import { parseThoughtPosition, thoughtPositionKey } from '@/src/hooks/use-thought-position'
 import { isMarkdownContent, markdownToPlainText } from '@/src/lib/markdown'
 import { aiOutputForDisplay } from '@/src/lib/ai-output'
+import { mergeThoughts } from '@/src/components/thoughts/thought-navigation'
+import type { ThoughtSummary } from '@/src/components/thoughts/thought-workspace'
 
 describe('thought workspace acceptance boundaries', () => {
+  it('merges more than twenty old ideas without duplicates', () => {
+    const summary = (index: number): ThoughtSummary => ({
+      id: `thought-${index}`,
+      createdAt: new Date(Date.UTC(2026, 7, 20, 0, index)).toISOString(),
+      lastActivityAt: new Date(Date.UTC(2026, 7, 20, 0, index)).toISOString(),
+      relationCheckedAt: null,
+      firstEntry: null,
+    })
+    const firstPage = Array.from({ length: 20 }, (_, index) => summary(index))
+    const nextPage = [summary(19), ...Array.from({ length: 5 }, (_, index) => summary(index + 20))]
+
+    const merged = mergeThoughts(firstPage, nextPage)
+
+    expect(merged).toHaveLength(25)
+    expect(merged[0].id).toBe('thought-24')
+    expect(merged.at(-1)?.id).toBe('thought-0')
+  })
+
   it('restores only a valid position for the same thought', () => {
     expect(thoughtPositionKey('thought-1')).toBe('retniw:thought-position:thought-1')
     expect(parseThoughtPosition('{"scrollY":320,"selectionStart":4,"selectionEnd":7}')).toEqual({
@@ -80,13 +100,14 @@ describe('thought workspace acceptance boundaries', () => {
     expect(header).not.toContain('href="/"')
     expect(header).toContain('account-menu')
     expect(navigation).toContain('写新想法')
-    expect(navigation).toContain('以前写过的')
+    expect(navigation).toContain('以前的想法')
     expect(navigation).not.toContain('当前想法')
-    expect(navigation).toContain('找找旧想法的联系')
+    expect(navigation).toContain('看看有没有联系')
     expect(navigation).toContain("/api/thoughts?cursor=")
     expect(navigation).toContain("sessionStorage.setItem(explicitNewThoughtKey, '1')")
     expect(navigation).toContain("timeZone: 'Asia/Shanghai'")
-    expect(workspace).toContain('写下一个念头，之后可以随时回来接着想。')
+    expect(navigation).toContain('prefetch={false}')
+    expect(workspace).toContain('写下你正在想的。')
     expect(workspace).toMatch(/entries\.length > 0 && \([\s\S]*<ThinkingAssist/)
     expect(workspace).toContain('if (item.thoughtId !== thoughtId) return')
     expect(workspace).toContain('if (explicitlyStartedNewThought) return')
@@ -94,7 +115,7 @@ describe('thought workspace acceptance boundaries', () => {
     expect(assist).toContain('帮我接着想')
     expect(assist).not.toContain("action: 'question'")
     expect(assist).not.toContain("action: 'organize'")
-    expect(menu).toContain('整理这个想法')
+    expect(menu).toContain('整理内容')
     expect(provider).not.toContain('第一句以“可以继续写：”开头')
     expect(capturePage).toContain('key="new-thought"')
   })
@@ -106,6 +127,14 @@ describe('thought workspace acceptance boundaries', () => {
     expect(headerRule).not.toContain('backdrop-filter')
     expect(headerRule).not.toContain('border:')
     expect(headerRule).not.toContain('background:')
+  })
+
+  it('keeps the desktop history column vertically scrollable without horizontal clipping', async () => {
+    const css = await readFile('src/index.css', 'utf8')
+    const sidebarRule = css.match(/\.thought-sidebar \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(sidebarRule).toContain('overflow-x: hidden')
+    expect(sidebarRule).toContain('overflow-y: auto')
+    expect(css).not.toMatch(/\.thought-link:hover \{[\s\S]*?translateX/)
   })
 
   it('uses the public domain as the beta entry', async () => {

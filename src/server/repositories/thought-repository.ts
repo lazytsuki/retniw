@@ -137,15 +137,19 @@ export class ThoughtRepository {
   }
 
   async getDetail(userId: string, thoughtId: string) {
-    const thought = await this.getOwned(userId, thoughtId)
-    const entries = await new EntryRepository(this.client).listByThought(userId, thoughtId)
-    const connectionsResult = await this.client
+    const connectionsQuery = this.client
       .from('thought_connections')
       .select('*')
       .eq('user_id', userId)
       .or(`source_thought_id.eq.${thoughtId},target_thought_id.eq.${thoughtId}`)
       .order('created_at', { ascending: false })
       .returns<ConnectionRecord[]>()
+
+    const [thought, entries, connectionsResult] = await Promise.all([
+      this.getOwned(userId, thoughtId),
+      new EntryRepository(this.client).listByThought(userId, thoughtId),
+      connectionsQuery,
+    ])
 
     if (connectionsResult.error) {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought connections')

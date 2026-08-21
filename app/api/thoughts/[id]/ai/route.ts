@@ -42,16 +42,16 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const client = createServiceClient()
     const thoughts = new ThoughtRepository(client)
     const entries = new EntryRepository(client)
-    const [, thoughtEntries] = await Promise.all([
+    const [, thoughtEntries, existing] = await Promise.all([
       thoughts.getOwned(user.id, thoughtId),
       entries.listByThought(user.id, thoughtId),
+      entries.findByClientRequest(user.id, clientRequestId),
     ])
     const contextLength = thoughtEntries.reduce((total, entry) => total + entry.content.length, 0)
     if (contextLength > 500_000) {
       throw new ApiError(413, 'CONTEXT_TOO_LARGE', 'This thought is too large for AI processing')
     }
 
-    const existing = await entries.findByClientRequest(user.id, clientRequestId)
     if (existing) {
       if (existing.thoughtId !== thoughtId || existing.entryType !== 'ai' || existing.aiAction !== action) {
         throw new ApiError(409, 'STATE_CONFLICT', 'This request id is already used')

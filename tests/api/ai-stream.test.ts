@@ -72,6 +72,24 @@ beforeEach(() => {
 })
 
 describe('thought AI stream route', () => {
+  it('starts independent checks together before opening the model stream', async () => {
+    let releaseEntries: ((entries: Array<{ entryType: string; content: string; sourceLabel: null }>) => void) | undefined
+    mocks.listEntries.mockReturnValue(new Promise((resolve) => {
+      releaseEntries = resolve
+    }))
+
+    const responsePromise = POST(request(), { params: Promise.resolve({ id: thoughtId }) })
+
+    await vi.waitFor(() => {
+      expect(mocks.getOwned).toHaveBeenCalled()
+      expect(mocks.listEntries).toHaveBeenCalled()
+      expect(mocks.findByRequest).toHaveBeenCalled()
+    })
+    releaseEntries?.([{ entryType: 'user', content: '原文', sourceLabel: null }])
+    const response = await responsePromise
+    await response.text()
+  })
+
   it('forwards ordered deltas and saves the complete output once', async () => {
     const response = await POST(request(), { params: Promise.resolve({ id: thoughtId }) })
     const stream = await response.text()

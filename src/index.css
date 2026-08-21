@@ -507,6 +507,7 @@ a.fragment-card:hover {
   top: 24px;
   min-width: 0;
   max-height: calc(100vh - 120px);
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgb(255 255 255 / 10%) transparent;
@@ -516,7 +517,7 @@ a.fragment-card:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 62px;
+  min-height: 54px;
   padding: 11px 12px;
   border: 1px solid rgb(255 255 255 / 11%);
   border-radius: 14px;
@@ -540,19 +541,9 @@ a.fragment-card:hover {
   color: var(--accent);
 }
 
-.new-thought-action span {
-  display: grid;
-  gap: 3px;
-}
-
 .new-thought-action strong {
   font-size: 13px;
   font-weight: 560;
-}
-
-.new-thought-action small {
-  color: rgb(245 245 243 / 34%);
-  font-size: 11px;
 }
 
 .all-thoughts {
@@ -1188,14 +1179,15 @@ a.fragment-card:hover {
 }
 
 .thought-link:hover,
-.thought-link--active {
+.thought-link--active,
+.thought-link--pending {
   border-color: rgb(255 255 255 / 12%);
   background: linear-gradient(135deg, rgb(255 255 255 / 7%), transparent 48%), rgb(255 255 255 / 4%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
 }
 
-.thought-link:hover {
-  transform: translateX(2px);
+.thought-link--pending time {
+  color: rgb(191 216 208 / 72%);
 }
 
 .thought-link span {

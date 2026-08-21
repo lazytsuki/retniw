@@ -16,9 +16,9 @@ export function ThinkingAssist({ disabled, waitingForInput, running, onContinue 
           <path d="m15 11 3 3-3 3" />
           <circle cx="6" cy="5" r="2" />
         </svg>
-        {running ? '正在看这段想法' : '帮我接着想'}
+        {running ? '正在生成' : '帮我接着想'}
       </button>
-      {waitingForInput && <p>写下你的回应后，可以再请 retniw 帮一步。</p>}
+      {waitingForInput && <p>写一点新的内容后，可以再用一次。</p>}
     </div>
   )
 }

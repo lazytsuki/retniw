@@ -5,9 +5,9 @@ import { aiOutputForDisplay } from '@/src/lib/ai-output'
 import { EntryContent } from './entry-content'
 
 const labels = {
-  advance: '一个可继续的方向',
-  question: '一个可继续的问题',
-  organize: '整理后的内容',
+  advance: '帮我接着想',
+  question: '帮我接着想',
+  organize: '整理结果',
 }
 
 export function StreamingAiEntry({ state, onClear }: { state: AiActionState; onClear: () => void }) {
@@ -24,7 +24,7 @@ export function StreamingAiEntry({ state, onClear }: { state: AiActionState; onC
         </svg>
         {state.action ? labels[state.action] : ''}
       </p>
-      {content ? <EntryContent content={content} markdown /> : <p className="ai-waiting">正在看这段想法</p>}
+      {content ? <EntryContent content={content} markdown /> : <p className="ai-waiting">正在生成</p>}
       {state.status === 'error' && (
         <div className="ai-unsaved">
           <span>{state.message}</span>

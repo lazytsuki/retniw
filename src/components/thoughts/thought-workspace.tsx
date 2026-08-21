@@ -279,9 +279,9 @@ export function ThoughtWorkspace({
       <section className="thought-main" id="current-thought" aria-label="当前想法">
         <header className="workspace-heading">
           {started ? (
-            <p className="workspace-kicker">这个想法</p>
+            <p className="workspace-kicker">继续写</p>
           ) : (
-            <h1>写下一个念头，之后可以随时回来接着想。</h1>
+            <h1>写下你正在想的。</h1>
           )}
           <ThoughtMenu
             thoughtId={started ? thoughtId : null}
@@ -307,7 +307,7 @@ export function ThoughtWorkspace({
                         <path d="m15 11 3 3-3 3" />
                         <circle cx="6" cy="5" r="2" />
                       </svg>
-                      {entry.aiAction === 'organize' ? '整理后的内容' : '一个可继续的方向'}
+                      {entry.aiAction === 'organize' ? '整理结果' : '帮我接着想'}
                     </p>
                   )}
                   <EntryContent

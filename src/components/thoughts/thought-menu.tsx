@@ -42,7 +42,7 @@ export function ThoughtMenu({
             onOrganize()
           }}
         >
-          {organizeRunning ? '正在整理' : '整理这个想法'}
+          {organizeRunning ? '正在整理' : '整理内容'}
         </button>
         <button
           type="button"

@@ -11,7 +11,7 @@ type ThoughtComposerProps = {
 }
 
 export function thoughtComposerCopy(hasEntries: boolean) {
-  const text = hasEntries ? '继续写这个想法' : '写下现在想到的'
+  const text = hasEntries ? '接着写' : '写在这里'
   return { ariaLabel: text, placeholder: text }
 }
 

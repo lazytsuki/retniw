@@ -11,12 +11,13 @@ const mocks = vi.hoisted(() => ({
   getDetail: vi.fn(),
   createEntry: vi.fn(),
   listEntries: vi.fn(),
+  decodeThoughtCursor: vi.fn(),
 }))
 
 vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
 vi.mock('@/src/lib/supabase/service', () => ({ createServiceClient: () => ({}) }))
 vi.mock('@/src/server/repositories/thought-repository', () => ({
-  decodeThoughtCursor: vi.fn(),
+  decodeThoughtCursor: mocks.decodeThoughtCursor,
   ThoughtRepository: class {
     ensure = mocks.ensure
     getOwned = mocks.getOwned
@@ -32,7 +33,7 @@ vi.mock('@/src/server/repositories/entry-repository', () => ({
   },
 }))
 
-import { POST as createThought } from '@/app/api/thoughts/route'
+import { GET as listThoughts, POST as createThought } from '@/app/api/thoughts/route'
 import { POST as appendEntry } from '@/app/api/thoughts/[id]/entries/route'
 
 const ids = {
@@ -82,6 +83,7 @@ beforeEach(() => {
   mocks.getOwned.mockResolvedValue(thought)
   mocks.touch.mockResolvedValue(undefined)
   mocks.createEntry.mockResolvedValue({ entry, created: true })
+  mocks.decodeThoughtCursor.mockReturnValue({ lastActivityAt: createdAt, id: ids.thought })
 })
 
 describe('thought write routes', () => {
@@ -132,5 +134,24 @@ describe('thought write routes', () => {
 
     expect(response.status).toBe(404)
     expect(mocks.createEntry).not.toHaveBeenCalled()
+  })
+})
+
+describe('thought list route', () => {
+  it('passes the next-page cursor through and returns the repository page', async () => {
+    const result = { thoughts: [thought], nextCursor: 'next-page' }
+    mocks.listRecent.mockResolvedValue(result)
+
+    const response = await listThoughts(
+      new NextRequest('http://localhost/api/thoughts?cursor=encoded-page'),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.decodeThoughtCursor).toHaveBeenCalledWith('encoded-page')
+    expect(mocks.listRecent).toHaveBeenCalledWith(ids.user, {
+      lastActivityAt: createdAt,
+      id: ids.thought,
+    })
+    expect((await response.json()).data).toEqual(result)
   })
 })
