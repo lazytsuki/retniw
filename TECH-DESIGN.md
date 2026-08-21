@@ -17,7 +17,7 @@ sql_dialect: postgresql
 | 位置 | 处理 | 结果 |
 | --- | --- | --- |
 | `AppHeader`、新增 `ThoughtNavigation` | 重构 | 页头保持平面；桌面常驻、移动固定只展示“写新想法”和“以前的想法”两个导航动作 |
-| `ThoughtWorkspace`、`ThoughtComposer` | 重构 | 空白状态用一句话串起写下与回来；当前想法直接在主区继续；首页与详情用不同 key 隔离状态 |
+| `ThoughtWorkspace`、`ThoughtComposer` | 重构 | 空白状态直接说明当前动作；当前想法在主区继续；首页与详情用不同 key 隔离状态 |
 | `ThinkingAssist`、`ThoughtMenu`、关系检查触发 | 重构 | 正文旁只保留“帮我接着想”；整理进入更多操作；找联系进入旧想法区域 |
 | `GET /api/thoughts`、所有想法列表 | 复用 | 使用现有游标继续加载，避免把首批二十条误称为全部内容 |
 | `CaptureComposer`、`FragmentTimeline` | 重写 | 保存后留在当前过程，输入始终可继续 |
@@ -69,7 +69,7 @@ flowchart TD
 - 需求/验收：未听过产品介绍的用户能在5秒内找到新想法和已有想法；手机与Mac入口含义一致，不依靠返回箭头或品牌标识切换。
 - 实现目标：`retniw-v2`，让新建、继续和回看成为所有工作区页面的稳定骨架。
 - 现状逻辑与代码证据：[`AppHeader`](src/components/app-header.tsx#AppHeader)在详情页用返回箭头回到首页，品牌本身也链接首页，退出直接占据顶栏；[`ThoughtWorkspace`](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)只在右栏有“最近”，900px以下会排到当前长内容末尾，且只渲染服务端首批二十条。
-- 增量修改：`AppHeader`移除返回和品牌跳转，将退出收进账号入口，并去掉强制包裹整行的sticky玻璃容器。新增`ThoughtNavigation`：桌面端左侧常驻“写新想法”和可分页的“以前写过的”；移动端在主区上方常驻“写新想法”“以前的想法”两个动作，后者打开可关闭的视口级面板。导航在文档流中占据空间，滚动时吸附在视口上沿，不覆盖输入。当前想法只在主区显示轻量状态，历史列表用第一段原文摘录并通过现有`GET /api/thoughts?cursor=`加载更多。`CapturePage`使用稳定`key="new-thought"`，确保从详情进入首页时卸载旧工作区状态，而不只是改变URL。
+- 增量修改：`AppHeader`移除返回和品牌跳转，将退出收进账号入口，并去掉强制包裹整行的sticky玻璃容器。新增`ThoughtNavigation`：桌面端左侧常驻“写新想法”和可分页的“以前的想法”；移动端在主区上方常驻同样两个动作，后者打开可关闭的视口级面板。导航在文档流中占据空间，滚动时吸附在视口上沿，不覆盖输入。当前想法只在主区显示轻量状态，历史列表用第一段原文摘录并通过现有`GET /api/thoughts?cursor=`加载更多。历史链接关闭批量视口预取，只在用户实际选择时请求详情，并立即显示“正在打开”；详情正文、entries、关系与最近列表中的独立查询并行执行。`CapturePage`使用稳定`key="new-thought"`，确保从详情进入首页时卸载旧工作区状态，而不只是改变URL。
 - 受影响符号：`AppHeader`、`ThoughtWorkspace`、`ThoughtNavigation`、`GET /api/thoughts`
 - 验证入口：在320、375、768、1024和1440像素视口分别从空白页、短想法和长想法找到两个导航动作；从详情点击“写新想法”后断言输入区为空；创建二十一条以上想法后加载更多并打开末页内容；断网保存后立即新建，再联网回读原内容。
 - 边界与不变约束：不新增标题、标签、文件夹、搜索页或独立历史路由；“以前的想法”只展示当前账号数据，复用现有服务端所有权校验。
@@ -79,7 +79,7 @@ flowchart TD
 - 需求/验收：首次用户不调用AI也能完成记录、回看和另起想法，并将产品理解为承接和继续想法而非聊天。
 - 实现目标：`retniw-v2`，用空白、已有内容和工具层级说明内容会去哪里。
 - 现状逻辑与代码证据：旧[`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer)在空白页和已有过程都显示同一句占位；旧`AiActions`把`advance/question/organize`与关系检查平铺为四个按钮；AI提示词和接口校验还强制输出“可以继续写：”，把内部动作直接暴露成产品语言。
-- 增量修改：空白页只显示“写下一个念头，之后可以随时回来接着想。”输入提示分别为“写下现在想到的”和“继续写这个想法”。有用户内容后，正文旁只渲染[`ThinkingAssist`](src/components/thoughts/thinking-assist.tsx#ThinkingAssist)的“帮我接着想”；[`ThoughtMenu`](src/components/thoughts/thought-menu.tsx#ThoughtMenu)收纳整理、导入和导出；找联系位于旧想法区域。`advance`提示词只返回一个最有用的问题或角度，不添加标题；[`aiOutputForDisplay`](src/lib/ai-output.ts#aiOutputForDisplay)清理旧数据的指令式前缀。普通内容仍按时间顺序平面展示，不使用聊天气泡。
+- 增量修改：空白页只显示“写下你正在想的。”，输入提示为“写在这里”；已有内容后显示“继续写”和“接着写”。有用户内容后，正文旁只渲染[`ThinkingAssist`](src/components/thoughts/thinking-assist.tsx#ThinkingAssist)的“帮我接着想”；[`ThoughtMenu`](src/components/thoughts/thought-menu.tsx#ThoughtMenu)收纳整理、导入和导出；找联系位于旧想法区域。AI输出来源直接标成“帮我接着想”或“整理结果”，处理状态只说“正在生成”。`advance`提示词只返回一个最有用的问题或角度，不添加标题；[`aiOutputForDisplay`](src/lib/ai-output.ts#aiOutputForDisplay)清理旧数据的指令式前缀。普通内容仍按时间顺序平面展示，不使用聊天气泡。
 - 受影响符号：`ThoughtWorkspace`、`ThoughtComposer`、`ThinkingAssist`、`ThoughtMenu`、`EntryContent`、`aiOutputForDisplay`
 - 验证入口：全新账号完成首次保存、打开以前的想法、另起想法和回到原想法；断言空白页不存在AI操作按钮或自动模型请求。
 
@@ -117,7 +117,7 @@ flowchart TD
 - 需求/验收：普通输入不自动回复；用户主动调用后100毫秒内有状态；逐步显示内容；失败不锁住输入。
 - 实现目标：`retniw-v2`，把 AI 从固定流程改为工作区中的显式工具。
 - 现状逻辑与代码证据：旧`AiActions`把`advance/question/organize`和关系检查平铺为四项操作；[`useAiAction.run`](src/hooks/use-ai-action.ts#run)与[`DeepSeekTextProvider.streamText`](src/server/ai/deepseek-text-provider.ts#streamText)已经按SSE逐段返回，但UI要求用户先理解模型策略差异，`advance`还被服务端强制加“可以继续写：”前缀。
-- 增量修改：[`ThinkingAssist`](src/components/thoughts/thinking-assist.tsx#ThinkingAssist)只向用户提供“帮我接着想”，调用现有`advance`动作；服务端自行选择问一个具体问题或指出一个角度，只返回一到两句且不加标题。整理保留`organize`动作，但只出现在[`ThoughtMenu`](src/components/thoughts/thought-menu.tsx#ThoughtMenu)；`question`接口为旧客户端兼容保留，不再单独出现在界面。找联系只在旧想法区域启动关系检查。点击AI操作时立即创建本地状态并读取SSE；完成后保存为AI entry，中断内容标记为未保存，不混入正式过程。
+- 增量修改：[`ThinkingAssist`](src/components/thoughts/thinking-assist.tsx#ThinkingAssist)只向用户提供“帮我接着想”，调用现有`advance`动作；服务端自行选择问一个具体问题或指出一个角度，只返回一到两句且不加标题。整理保留`organize`动作，但只出现在[`ThoughtMenu`](src/components/thoughts/thought-menu.tsx#ThoughtMenu)；`question`接口为旧客户端兼容保留，不再单独出现在界面。找联系只在旧想法区域启动关系检查。点击AI操作时立即创建本地状态并读取SSE；所有权、entries和幂等请求检查并行执行，完成后保存为AI entry，中断内容标记为未保存，不混入正式过程。
 - 受影响符号：`ThinkingAssist`、`ThoughtMenu`、`StreamingAiEntry`、`useAiAction`、`aiOutputForDisplay`、`DeepSeekTextProvider.streamText`、`POST /api/thoughts/[id]/ai`
 - 验证入口：普通保存时断言没有 DeepSeek 请求；逐块模拟 SSE，断言首块立刻可见；供应商超时、断流和非法响应时，原有 entries 不变且输入仍可提交。
 - 边界与不变约束：AI 不自动续聊、不替用户决定下一步、不覆盖用户或导入原文。

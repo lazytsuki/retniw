@@ -1,7 +1,7 @@
 # WORKFLOW-STATE
 
-- current_stage: release
-- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈"
+- current_stage: implementation_complete
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
   - PRD.md
@@ -91,6 +91,14 @@
   - "M-007交付前审查补正明确新建与断网草稿恢复的状态边界，并将会遮挡输入的移动底部浮层改为文档流内占位的常驻导航"
   - "M-007本地交付门禁通过：13个测试文件、74个测试、类型检查、Lint、Next.js生产构建、依赖高危审计和diff检查均通过；Chromium在320、375、768、1024、1440像素无横向溢出"
   - "M-007首轮生产回放发现Vercel服务端与浏览器时区不同导致旧想法时间hydration不一致；列表格式化固定Asia/Shanghai后进入第二次发布验证"
+  - "M-007生产修复发布完成：retniw.cn与retniw.vercel.app均指向包含时区补正的READY部署；旧地址继续以HTTP 308跳转到正式域名"
+  - "M-007最终生产回放通过：桌面空白态无AI入口，移动端导航不覆盖输入，已有想法只有一个帮我接着想入口，旧前缀不显示；生产控制台0错误、0警告"
+  - "M-007分页补充验证覆盖首批20条与后续页合并去重，最终13个测试文件、76个测试、类型检查、Lint和生产构建通过"
+  - "M-007现网反馈补正：侧栏纵向滚动不再隐式开启横向滚动，历史项取消右移，选中边框无需滑动即可完整显示"
+  - "M-007响应优化：历史列表不再并发预取全部详情，同一次选择只请求一个详情；详情数据与AI前置检查中的独立查询并行，导航和模型入口立即显示处理中状态"
+  - "M-007产品文案二次收口：空白态改为写下你正在想的，输入只说写在这里或接着写，AI结果来源只说帮我接着想或整理结果"
+  - "M-007反馈版运行时代码发布完成：代码基线f58d2d7已在正式域名验证；桌面侧栏clientWidth与scrollWidth均为280，320像素移动端无横向溢出，生产控制台0错误、0警告"
+  - "M-007最终门禁更新为13个测试文件、78个测试、类型检查、Lint、生产构建、依赖高危审计和diff检查全部通过"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -104,9 +112,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "提交并推送M-007，等待Vercel生产部署后在retniw.cn回放主链路与旧域名跳转"
+- suggested_next_action: "邀请未听过产品介绍的用户直接体验90秒，记录他们如何理解产品、如何另起想法和何时会主动使用帮我接着想"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
 - last_confirmed_stage: code_review
 - confirmation_gate: ""
-- release_checklist: ready
+- release_checklist: done
