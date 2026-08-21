@@ -85,6 +85,7 @@ describe('thought workspace acceptance boundaries', () => {
     expect(navigation).toContain('找找旧想法的联系')
     expect(navigation).toContain("/api/thoughts?cursor=")
     expect(navigation).toContain("sessionStorage.setItem(explicitNewThoughtKey, '1')")
+    expect(navigation).toContain("timeZone: 'Asia/Shanghai'")
     expect(workspace).toContain('写下一个念头，之后可以随时回来接着想。')
     expect(workspace).toMatch(/entries\.length > 0 && \([\s\S]*<ThinkingAssist/)
     expect(workspace).toContain('if (item.thoughtId !== thoughtId) return')
