@@ -22,12 +22,16 @@ import { hasNewUserContext } from '@/src/lib/ai-context'
 import { aiOutputForDisplay } from '@/src/lib/ai-output'
 import { ThoughtNavigation } from './thought-navigation'
 import { ThoughtMenu } from './thought-menu'
+import { CheckpointDialog } from './checkpoint-dialog'
+import type { ThoughtCheckpoint } from '@/src/server/repositories/checkpoint-repository'
+import { useOverlayController } from '@/src/components/overlay-provider'
 
 export type ThoughtSummary = Thought & { firstEntry: Entry | null }
 
 type ThoughtWorkspaceProps = {
   initialThought: Thought | null
   initialEntries: Entry[]
+  initialCheckpoints: ThoughtCheckpoint[]
   initialThoughts: ThoughtSummary[]
   initialNextCursor: string | null
   initialConnections: RelationConnection[]
@@ -42,18 +46,31 @@ const explicitNewThoughtKey = 'retniw:explicit-new-thought'
 export function ThoughtWorkspace({
   initialThought,
   initialEntries,
+  initialCheckpoints,
   initialThoughts,
   initialNextCursor,
   initialConnections,
 }: ThoughtWorkspaceProps) {
   const router = useRouter()
+  const overlay = useOverlayController()
   const [thoughtId, setThoughtId] = useState(() => initialThought?.id ?? crypto.randomUUID())
   const [ids, setIds] = useState(nextIds)
   const [content, setContent] = useState('')
   const [localEntries, setLocalEntries] = useState<Entry[]>([])
   const [started, setStarted] = useState(Boolean(initialThought))
-  const [importOpen, setImportOpen] = useState(false)
-  const textareaRef = useThoughtPosition(thoughtId, content)
+  const [localCheckpoints, setLocalCheckpoints] = useState<ThoughtCheckpoint[]>([])
+  const checkpoints = useMemo(
+    () => [...initialCheckpoints, ...localCheckpoints].sort(
+      (left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+    ),
+    [initialCheckpoints, localCheckpoints],
+  )
+  const lastCheckpointId = checkpoints.at(-1)?.id
+  const textareaRef = useThoughtPosition(
+    thoughtId,
+    content,
+    lastCheckpointId ? `checkpoint-${lastCheckpointId}` : undefined,
+  )
   const initialPending = initialConnections.find(
     (connection) =>
       connection.status === 'pending' &&
@@ -176,6 +193,9 @@ export function ThoughtWorkspace({
         id: thoughtId,
         createdAt: firstEntry.createdAt,
         relationCheckedAt: null,
+        collectionId: null,
+        archivedAt: null,
+        deletedAt: null,
       }),
       lastActivityAt,
       firstEntry,
@@ -266,6 +286,41 @@ export function ThoughtWorkspace({
     setLocalEntries((current) => [...current, payload.data!.entry!])
   }
 
+  async function handleCheckpoint(note: string) {
+    const response = await fetch(`/api/thoughts/${thoughtId}/checkpoints`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        entryId: crypto.randomUUID(),
+        clientRequestId: crypto.randomUUID(),
+        note,
+      }),
+    })
+    const payload = await response.json().catch(() => null) as
+      | { data?: { checkpoint?: ThoughtCheckpoint } }
+      | null
+    if (!response.ok || !payload?.data?.checkpoint) throw new Error('CHECKPOINT_FAILED')
+    setLocalCheckpoints((current) => [...current, payload.data!.checkpoint!])
+    router.push('/')
+  }
+
+  const timeline = useMemo(() => [
+    ...entries.map((entry) => ({
+      kind: 'entry' as const,
+      createdAt: entry.createdAt,
+      id: entry.id,
+      entry,
+    })),
+    ...checkpoints.map((checkpoint) => ({
+      kind: 'checkpoint' as const,
+      createdAt: checkpoint.createdAt,
+      id: checkpoint.id,
+      checkpoint,
+    })),
+  ].sort(
+    (left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+  ), [checkpoints, entries])
+
   return (
     <div className="thought-layout">
       <ThoughtNavigation
@@ -287,13 +342,22 @@ export function ThoughtWorkspace({
             thoughtId={started ? thoughtId : null}
             organizeDisabled={!canUseAi}
             organizeRunning={ai.state.status === 'streaming' && ai.state.action === 'organize'}
-            onImport={() => setImportOpen(true)}
+            onImport={() => overlay.open('import')}
             onOrganize={() => void ai.run(thoughtId, 'organize')}
           />
         </header>
-        {entries.length > 0 && (
+        {timeline.length > 0 && (
           <div className="thought-entries">
-            {entries.map((entry) => {
+            {timeline.map((item) => {
+              if (item.kind === 'checkpoint') {
+                return (
+                  <div className="thought-checkpoint" id={`checkpoint-${item.checkpoint.id}`} key={item.id}>
+                    <span>先到这里</span>
+                    {item.checkpoint.note && <p>{item.checkpoint.note}</p>}
+                  </div>
+                )
+              }
+              const entry = item.entry
               const displayContent = entry.entryType === 'ai'
                 ? aiOutputForDisplay(entry.content, entry.aiAction)
                 : entry.content
@@ -330,6 +394,16 @@ export function ThoughtWorkspace({
         />
         <SyncStatus items={activeOutbox} syncing={outbox.syncing} onRetry={() => void outbox.retry()} />
         {entries.length > 0 && (
+          <button
+            className="checkpoint-action"
+            type="button"
+            onClick={(event) => overlay.open('checkpoint', event.currentTarget)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v16M7 5h10l-2.5 4L17 13H7" /></svg>
+            先到这里
+          </button>
+        )}
+        {entries.length > 0 && (
           <ThinkingAssist
             disabled={!canUseAi || ai.state.status === 'streaming'}
             waitingForInput={started && !canUseAi}
@@ -346,11 +420,12 @@ export function ThoughtWorkspace({
           onDecide={(decision) => void decideRelation(decision)}
         />
         <ImportTextDialog
-          open={importOpen}
+          open={overlay.isOpen('import')}
           currentAllowed={started}
-          onClose={() => setImportOpen(false)}
+          onClose={() => overlay.close('import')}
           onImport={handleImport}
         />
+        <CheckpointDialog open={overlay.isOpen('checkpoint')} onSave={handleCheckpoint} />
       </section>
     </div>
   )

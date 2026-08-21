@@ -8,16 +8,16 @@ const user = { id: 'owner-id', email: 'owner@example.com' } as User
 describe('requireUser', () => {
   it('returns the authenticated user', async () => {
     const client: AuthClient = {
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }) },
+      auth: { getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: user.id } }, error: null }) },
     }
 
-    await expect(requireUser(client)).resolves.toBe(user)
-    expect(client.auth.getUser).toHaveBeenCalledOnce()
+    await expect(requireUser(client)).resolves.toEqual({ id: user.id })
+    expect(client.auth.getClaims).toHaveBeenCalledOnce()
   })
 
   it('maps a missing session to 401', async () => {
     const client: AuthClient = {
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }) },
+      auth: { getClaims: vi.fn().mockResolvedValue({ data: { claims: null }, error: null }) },
     }
 
     await expect(requireUser(client)).rejects.toMatchObject({

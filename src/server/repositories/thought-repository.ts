@@ -1,12 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ApiError } from '@/src/lib/api-error'
 import { EntryRepository, type Entry, type EntryRecord, toEntry } from './entry-repository'
+import { CheckpointRepository } from './checkpoint-repository'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export type ThoughtRecord = {
   id: string
   user_id: string
+  collection_id: string | null
+  archived_at: string | null
+  deleted_at: string | null
+  summary_content: string | null
+  summary_entry_type: 'user' | 'import' | 'ai' | null
+  summary_source_label: string | null
   last_activity_at: string
   relation_checked_at: string | null
   created_at: string
@@ -14,6 +21,9 @@ export type ThoughtRecord = {
 
 export type Thought = {
   id: string
+  collectionId: string | null
+  archivedAt: string | null
+  deletedAt: string | null
   lastActivityAt: string
   relationCheckedAt: string | null
   createdAt: string
@@ -34,6 +44,9 @@ type ConnectionRecord = {
 export function toThought(row: ThoughtRecord): Thought {
   return {
     id: row.id,
+    collectionId: row.collection_id ?? null,
+    archivedAt: row.archived_at ?? null,
+    deletedAt: row.deleted_at ?? null,
     lastActivityAt: row.last_activity_at,
     relationCheckedAt: row.relation_checked_at,
     createdAt: row.created_at,
@@ -64,6 +77,7 @@ export class ThoughtRepository {
       .select('*')
       .eq('user_id', userId)
       .eq('id', thoughtId)
+      .is('deleted_at', null)
       .maybeSingle<ThoughtRecord>()
 
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought')
@@ -77,19 +91,52 @@ export class ThoughtRepository {
       .update({ last_activity_at: activityAt })
       .eq('user_id', userId)
       .eq('id', thoughtId)
+      .is('deleted_at', null)
       .lt('last_activity_at', activityAt)
 
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update thought activity')
   }
 
-  async listRecent(userId: string, cursor?: { lastActivityAt: string; id: string }) {
+  async setSummaryIfEmpty(userId: string, thoughtId: string, entry: Entry) {
+    if (entry.entryType === 'ai') return
+    const content = entry.content.trim().slice(0, 500)
+    if (!content) return
+    const { error } = await this.client
+      .from('thoughts')
+      .update({
+        summary_content: content,
+        summary_entry_type: entry.entryType,
+        summary_source_label: entry.sourceLabel,
+      })
+      .eq('user_id', userId)
+      .eq('id', thoughtId)
+      .is('summary_content', null)
+
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update thought summary')
+  }
+
+  async listRecent(
+    userId: string,
+    cursor?: { lastActivityAt: string; id: string },
+    options: { scope?: 'active' | 'archived' | 'deleted'; collectionId?: string } = {},
+  ) {
+    const scope = options.scope ?? 'active'
     let query = this.client
       .from('thoughts')
-      .select('*, entries!inner(id)')
+      .select('*')
       .eq('user_id', userId)
       .order('last_activity_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(21)
+
+    if (scope === 'active') {
+      query = query.is('deleted_at', null).is('archived_at', null)
+    } else if (scope === 'archived') {
+      query = query.is('deleted_at', null).not('archived_at', 'is', null)
+    } else {
+      query = query.not('deleted_at', 'is', null)
+    }
+    if (options.collectionId) query = query.eq('collection_id', options.collectionId)
 
     if (cursor) {
       query = query.or(
@@ -100,37 +147,25 @@ export class ThoughtRepository {
     const result = await query
     if (result.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to list thoughts')
 
-    const rows = (result.data ?? []) as unknown as Array<ThoughtRecord & { entries: { id: string }[] }>
+    const rows = (result.data ?? []) as unknown as ThoughtRecord[]
     const hasMore = rows.length > 20
     const page = rows.slice(0, 20)
-    const thoughtIds = page.map((row) => row.id)
-    let entryRows: EntryRecord[] = []
-
-    if (thoughtIds.length) {
-      const entriesResult = await this.client
-        .from('entries')
-        .select('*')
-        .eq('user_id', userId)
-        .in('thought_id', thoughtIds)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .returns<EntryRecord[]>()
-
-      if (entriesResult.error) {
-        throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought entries')
-      }
-      entryRows = entriesResult.data
-    }
-
-    const firstEntries = new Map<string, Entry>()
-    for (const entry of entryRows) {
-      if (!firstEntries.has(entry.thought_id)) firstEntries.set(entry.thought_id, toEntry(entry))
-    }
 
     return {
       thoughts: page.map((row) => ({
         ...toThought(row),
-        firstEntry: firstEntries.get(row.id) ?? null,
+        firstEntry: row.summary_content && row.summary_entry_type
+          ? {
+              id: row.id,
+              thoughtId: row.id,
+              clientRequestId: row.id,
+              entryType: row.summary_entry_type,
+              content: row.summary_content,
+              sourceLabel: row.summary_source_label,
+              aiAction: null,
+              createdAt: row.created_at,
+            } satisfies Entry
+          : null,
       })),
       nextCursor: hasMore && page.length ? encodeThoughtCursor(page.at(-1)!) : null,
     }
@@ -145,9 +180,10 @@ export class ThoughtRepository {
       .order('created_at', { ascending: false })
       .returns<ConnectionRecord[]>()
 
-    const [thought, entries, connectionsResult] = await Promise.all([
+    const [thought, entries, checkpoints, connectionsResult] = await Promise.all([
       this.getOwned(userId, thoughtId),
       new EntryRepository(this.client).listByThought(userId, thoughtId),
+      new CheckpointRepository(this.client).listByThought(userId, thoughtId),
       connectionsQuery,
     ])
 
@@ -177,6 +213,7 @@ export class ThoughtRepository {
     return {
       thought,
       entries,
+      checkpoints,
       connections: connectionsResult.data.map((connection) => ({
         id: connection.id,
         sourceThoughtId: connection.source_thought_id,
@@ -189,6 +226,47 @@ export class ThoughtRepository {
         createdAt: connection.created_at,
       })),
     }
+  }
+
+  async updateAction(
+    userId: string,
+    thoughtId: string,
+    action:
+      | { action: 'move'; collectionId: string | null }
+      | { action: 'archive' | 'unarchive' | 'delete' | 'restore' },
+  ) {
+    if (action.action === 'move' && action.collectionId) {
+      const collection = await this.client
+        .from('thought_collections')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('id', action.collectionId)
+        .maybeSingle<{ id: string }>()
+      if (collection.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read collection')
+      if (!collection.data) throw new ApiError(404, 'NOT_FOUND', 'Collection not found')
+    }
+
+    const now = new Date().toISOString()
+    const values = action.action === 'move'
+      ? { collection_id: action.collectionId }
+      : action.action === 'archive'
+        ? { archived_at: now }
+        : action.action === 'unarchive'
+          ? { archived_at: null }
+          : action.action === 'delete'
+            ? { deleted_at: now }
+            : { deleted_at: null }
+
+    let query = this.client
+      .from('thoughts')
+      .update(values)
+      .eq('user_id', userId)
+      .eq('id', thoughtId)
+    if (action.action !== 'restore') query = query.is('deleted_at', null)
+    const { data, error } = await query.select('*').maybeSingle<ThoughtRecord>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update thought')
+    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
+    return toThought(data)
   }
 }
 

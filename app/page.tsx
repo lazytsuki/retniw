@@ -26,6 +26,7 @@ export default async function CapturePage() {
         key="new-thought"
         initialThought={null}
         initialEntries={[]}
+        initialCheckpoints={[]}
         initialThoughts={recent.thoughts}
         initialNextCursor={recent.nextCursor}
         initialConnections={[]}

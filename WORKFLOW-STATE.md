@@ -1,7 +1,7 @@
 # WORKFLOW-STATE
 
-- current_stage: implementation_complete
-- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈"
+- current_stage: implementation
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
   - PRD.md
@@ -14,6 +14,11 @@
   - TASK-M-005-开放导入导出.md
   - TASK-M-006-跨端可用性验收.md
   - TASK-M-007-零说明书体验收口.md
+  - tasks-v23/TASK-STATUS.md
+  - tasks-v23/TASK-M-008-状态与响应底座.md
+  - tasks-v23/TASK-M-009-统一操作层.md
+  - tasks-v23/TASK-M-010-想法管理与合集.md
+  - tasks-v23/TASK-M-011-思考停靠与发布.md
   - COMPETITIVE-BRIEF.md
   - CODE-REVIEW.md
   - 上线checkList.md
@@ -99,6 +104,16 @@
   - "M-007产品文案二次收口：空白态改为写下你正在想的，输入只说写在这里或接着写，AI结果来源只说帮我接着想或整理结果"
   - "M-007反馈版运行时代码发布完成：代码基线f58d2d7已在正式域名验证；桌面侧栏clientWidth与scrollWidth均为280，320像素移动端无横向溢出，生产控制台0错误、0警告"
   - "M-007最终门禁更新为13个测试文件、78个测试、类型检查、Lint、生产构建、依赖高危审计和diff检查全部通过"
+  - "新一轮需求澄清确认上层分类采用单层合集，不做嵌套项目或文件夹；管理动作统一使用移入、归档、删除，SVG只辅助识别而不替代文字"
+  - "单层合集采用一对多归属：一个合集可包含多个想法，一个想法最多移入一个合集，未移入时仍可独立存在；跨主题关联继续由联系承担"
+  - "先到这里只留下可选停靠点并返回全部想法，不自动归档；归档只改变常用列表可见性，移入只改变合集归属"
+  - "用户确认本轮需求分析，并授权分歧解决后连续推进PRD、技术设计、实现、验证和发布，不再设置重复确认门禁"
+  - "PRD V2.3完成零说明书体验补充：先到这里形成停靠闭环，移入、归档、删除分别处理内容归属、列表可见性和数据生命周期"
+  - "TECH-DESIGN按四条独立状态轴完成并通过专用校验：停靠使用独立checkpoint，合集保持单层，历史摘要改为thought短字段，身份使用claims校验"
+  - "V2.3任务拆解落在tasks-v23目录并通过专用校验：M-008状态与响应底座、M-009统一操作层、M-010想法管理与合集、M-011思考停靠与发布"
+  - "V2.3阶段实现已落地：生产兼容迁移生效，17条旧想法摘要完成幂等回填；统一浮层、单层合集、移入归档删除、软删除恢复和checkpoint接口与界面已进入代码"
+  - "阶段浏览器回放已覆盖1440和375像素：无横向溢出，账号与更多互斥关闭、移入合集、有备注先到这里返回首页并重开边界通过；归档删除恢复、320/1024、WebKit、代码审查、发布清单和正式域名仍待继续"
+  - "2026-08-21用户要求因即将断网阶段暂停；本轮只做本地阶段提交和GitHub同步，不部署未完成版本，重连后沿当前目标继续"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -112,9 +127,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "邀请未听过产品介绍的用户直接体验90秒，记录他们如何理解产品、如何另起想法和何时会主动使用帮我接着想"
+- suggested_next_action: "用户重连后从阶段提交继续：完成最新构建与320/1024/WebKit回放，补归档删除恢复和手势终验，再做代码审查、发布清单、部署及retniw.cn验证"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
-- last_confirmed_stage: code_review
+- last_confirmed_stage: tech_design
 - confirmation_gate: ""
-- release_checklist: done
+- release_checklist: pending

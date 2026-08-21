@@ -36,6 +36,7 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
         key={data.thought.id}
         initialThought={data.thought}
         initialEntries={data.entries}
+        initialCheckpoints={data.checkpoints}
         initialThoughts={recent.thoughts}
         initialNextCursor={recent.nextCursor}
         initialConnections={data.connections}

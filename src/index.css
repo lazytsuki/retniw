@@ -101,25 +101,25 @@ a {
   font-size: 12px;
 }
 
-.account-menu summary {
+.account-menu > button {
   padding: 8px 10px;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
-  list-style: none;
 }
 
-.account-menu summary::-webkit-details-marker {
-  display: none;
-}
-
-.account-menu summary:hover,
-.account-menu[open] summary {
+.account-menu > button:hover,
+.account-menu > button[aria-expanded="true"] {
   background: rgb(255 255 255 / 7%);
   color: rgb(245 245 243 / 78%);
 }
 
 .account-menu__panel {
   position: absolute;
+  z-index: 80;
   top: calc(100% + 8px);
   right: 0;
   width: 132px;
@@ -411,28 +411,26 @@ a.fragment-card:hover {
   flex: 0 0 auto;
 }
 
-.thought-menu > summary {
+.thought-menu > button {
   display: grid;
   width: 36px;
   height: 36px;
   place-items: center;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
+  background: transparent;
   color: rgb(245 245 243 / 42%);
   cursor: pointer;
-  list-style: none;
 }
 
-.thought-menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.thought-menu > summary:hover,
-.thought-menu[open] > summary {
+.thought-menu > button:hover,
+.thought-menu > button[aria-expanded="true"] {
   background: rgb(255 255 255 / 6%);
   color: rgb(245 245 243 / 72%);
 }
 
-.thought-menu > summary svg {
+.thought-menu > button svg {
   width: 19px;
   fill: currentColor;
 }
@@ -675,6 +673,78 @@ a.fragment-card:hover {
   max-height: calc(min(78dvh, 760px) - 58px);
   padding: 12px 14px calc(22px + env(safe-area-inset-bottom));
   overflow-y: auto;
+}
+
+.thought-navigation__heading {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 9px;
+}
+
+.thought-navigation__heading > button,
+.thought-navigation__sections > button,
+.collection-link button {
+  border: 0;
+  background: transparent;
+  color: rgb(245 245 243 / 44%);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thought-navigation__heading > button:hover,
+.thought-navigation__sections > button:hover,
+.collection-link button:hover {
+  color: rgb(245 245 243 / 76%);
+}
+
+.thought-navigation__sections {
+  display: grid;
+  gap: 4px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+}
+
+.thought-navigation__sections section {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.thought-navigation__sections h3 {
+  margin: 0 0 5px;
+  color: rgb(245 245 243 / 30%);
+  font-size: 11px;
+  font-weight: 520;
+}
+
+.thought-navigation__sections > button,
+.collection-link > button:first-child {
+  width: 100%;
+  padding: 8px 4px;
+}
+
+.collection-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.collection-link > button:last-child {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  text-align: center;
+  opacity: 0;
+}
+
+.collection-link:hover > button:last-child,
+.collection-link:focus-within > button:last-child {
+  opacity: 1;
 }
 
 .thought-entries {
@@ -1168,6 +1238,78 @@ a.fragment-card:hover {
   gap: 8px;
 }
 
+.thought-list-item {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.thought-list-item__surface {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: #0b0d0f;
+  touch-action: pan-y;
+  transition: transform 160ms ease;
+}
+
+.thought-list-item:hover .thought-list-item__surface,
+.thought-list-item__surface--active,
+.thought-list-item__surface--pending {
+  border-color: rgb(255 255 255 / 12%);
+  background: linear-gradient(135deg, rgb(255 255 255 / 7%), transparent 48%), rgb(255 255 255 / 4%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.thought-list-item__swipe-actions {
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
+  width: 152px;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.thought-list-item__swipe-actions button {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  padding: 5px;
+  border: 0;
+  background: rgb(255 255 255 / 7%);
+  color: rgb(245 245 243 / 68%);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.thought-list-item__swipe-actions button:disabled {
+  pointer-events: none;
+}
+
+.thought-list-item__swipe-actions button.danger {
+  background: #8f3734;
+  color: #fff;
+}
+
+.thought-list-item__swipe-actions svg,
+.thought-action-menu svg {
+  width: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
 .thought-link {
   display: grid;
   gap: 8px;
@@ -1178,12 +1320,25 @@ a.fragment-card:hover {
   text-decoration: none;
 }
 
+.thought-list-item .thought-link {
+  min-width: 0;
+  border-radius: 14px 0 0 14px;
+}
+
 .thought-link:hover,
 .thought-link--active,
 .thought-link--pending {
   border-color: rgb(255 255 255 / 12%);
   background: linear-gradient(135deg, rgb(255 255 255 / 7%), transparent 48%), rgb(255 255 255 / 4%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.thought-list-item .thought-link:hover,
+.thought-list-item .thought-link--active,
+.thought-list-item .thought-link--pending {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .thought-link--pending time {
@@ -1202,6 +1357,304 @@ a.fragment-card:hover {
 .thought-link time {
   color: rgb(245 245 243 / 30%);
   font-size: 11px;
+}
+
+.thought-action-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thought-action-menu__trigger {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: rgb(245 245 243 / 42%);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.thought-list-item:hover .thought-action-menu__trigger,
+.thought-list-item:focus-within .thought-action-menu__trigger,
+.thought-action-menu__trigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.thought-action-menu__trigger:hover,
+.thought-action-menu__trigger[aria-expanded="true"] {
+  background: rgb(255 255 255 / 8%);
+  color: rgb(245 245 243 / 76%);
+}
+
+.thought-action-menu__trigger svg {
+  width: 17px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.thought-action-menu__panel,
+.collection-picker {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% - 3px);
+  right: 0;
+  display: grid;
+  width: 178px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 13px;
+  background: rgb(17 20 23 / 97%);
+  color: rgb(245 245 243 / 72%);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 46%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.thought-action-menu__panel button,
+.collection-picker > button {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thought-action-menu__panel button:hover,
+.collection-picker > button:hover,
+.collection-picker > button[aria-pressed="true"] {
+  background: rgb(255 255 255 / 7%);
+  color: rgb(245 245 243 / 92%);
+}
+
+.thought-action-menu__panel .thought-action-menu__danger {
+  color: #d99b96;
+}
+
+.collection-picker {
+  width: 220px;
+  max-height: 330px;
+  overflow-y: auto;
+}
+
+.collection-picker > p {
+  margin: 3px 10px 6px;
+  color: rgb(245 245 243 / 36%);
+  font-size: 11px;
+}
+
+.collection-picker__create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.collection-picker__create input {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  outline: none;
+  background: rgb(0 0 0 / 18%);
+  color: #f2f2ef;
+  font: inherit;
+  font-size: 12px;
+}
+
+.collection-picker__create button {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 9%);
+  color: rgb(245 245 243 / 68%);
+  cursor: pointer;
+}
+
+.collection-picker__create button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.collection-picker__error {
+  margin: 8px 8px 3px;
+  color: #d5a09a;
+  font-size: 11px;
+}
+
+.checkpoint-action {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(245 245 243 / 52%);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.checkpoint-action:hover {
+  border-color: rgb(255 255 255 / 20%);
+  color: rgb(245 245 243 / 78%);
+}
+
+.checkpoint-action svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.thought-checkpoint {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 4px 0;
+  padding: 10px 4px;
+  color: rgb(245 245 243 / 34%);
+  font-size: 11px;
+}
+
+.thought-checkpoint::before,
+.thought-checkpoint::after {
+  height: 1px;
+  flex: 1 1 auto;
+  background: rgb(255 255 255 / 8%);
+  content: "";
+}
+
+.thought-checkpoint p {
+  max-width: 46%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confirm-dialog,
+.checkpoint-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(430px, calc(100% - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 22px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 18px;
+  background: rgb(17 20 23 / 97%);
+  color: #f2f2ef;
+  box-shadow: 0 28px 80px rgb(0 0 0 / 56%);
+}
+
+.confirm-dialog::backdrop,
+.checkpoint-dialog::backdrop {
+  background: rgb(0 0 0 / 68%);
+  backdrop-filter: blur(7px);
+}
+
+.confirm-dialog h2,
+.checkpoint-dialog h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 540;
+}
+
+.confirm-dialog p,
+.checkpoint-dialog label,
+.checkpoint-dialog > p {
+  color: rgb(245 245 243 / 48%);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.confirm-dialog > div,
+.checkpoint-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.confirm-dialog > div {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.confirm-dialog button,
+.checkpoint-dialog button {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 8%);
+  color: rgb(245 245 243 / 70%);
+  font: inherit;
+  cursor: pointer;
+}
+
+.confirm-dialog button.danger {
+  background: #8f3734;
+  color: #fff;
+}
+
+.checkpoint-dialog header > button {
+  background: transparent;
+  color: rgb(245 245 243 / 46%);
+}
+
+.checkpoint-dialog label {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.checkpoint-dialog textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 12px;
+  outline: none;
+  background: rgb(0 0 0 / 18%);
+  color: #f2f2ef;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.checkpoint-dialog > button {
+  width: 100%;
+  margin-top: 18px;
+  background: #efefec;
+  color: #111315;
+}
+
+.checkpoint-dialog > button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .thought-skeleton {
@@ -1605,6 +2058,29 @@ a.fragment-card:hover {
 
   .capture-surface textarea {
     min-height: 220px;
+  }
+
+  .thought-action-menu__trigger {
+    opacity: 1;
+  }
+
+  .thought-action-menu__panel,
+  .collection-picker {
+    position: fixed;
+    z-index: 90;
+    inset: auto 0 0;
+    width: min(100%, 680px);
+    max-height: min(70dvh, 560px);
+    margin: 0 auto;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -24px 70px rgb(0 0 0 / 54%);
+  }
+
+  .thought-action-menu__panel button,
+  .collection-picker > button {
+    min-height: 48px;
+    font-size: 14px;
   }
 }
 

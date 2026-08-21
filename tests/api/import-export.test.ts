@@ -3,6 +3,8 @@ import { parseImportedText, validateImportedText } from '@/src/lib/import/parse-
 import { parseEntryInput } from '@/src/server/fragments/parse-fragment-input'
 import { createFullExportStream, createThoughtMarkdownStream } from '@/src/server/exports/export-streams'
 import type {
+  ExportCheckpoint,
+  ExportCollection,
   ExportConnection,
   ExportEntry,
   ExportThought,
@@ -34,7 +36,17 @@ describe('streaming export', () => {
     id: thoughtId,
     createdAt: '2026-08-20T01:00:00.000Z',
     lastActivityAt: '2026-08-20T01:02:00.000Z',
+    collectionId: null,
+    archivedAt: null,
+    deletedAt: null,
   }
+  const collections: ExportCollection[] = []
+  const checkpoints: ExportCheckpoint[] = [{
+    id: 'checkpoint-1',
+    thoughtId,
+    note: '下次从这里接着想。',
+    createdAt: '2026-08-20T01:02:30.000Z',
+  }]
   const entries: ExportEntry[] = Array.from({ length: 501 }, (_, index) => ({
     id: `entry-${index}`,
     thoughtId,
@@ -57,8 +69,14 @@ describe('streaming export', () => {
 
   function repository() {
     return {
+      listCollectionPage: vi.fn(async (_userId: string, offset: number, limit: number) =>
+        collections.slice(offset, offset + limit),
+      ),
       listThoughtPage: vi.fn(async (_userId: string, offset: number, limit: number) =>
         [thought].slice(offset, offset + limit),
+      ),
+      listCheckpointPage: vi.fn(async (_userId: string, offset: number, limit: number) =>
+        checkpoints.slice(offset, offset + limit),
       ),
       listEntryPage: vi.fn(async (_userId: string, offset: number, limit: number) =>
         entries.slice(offset, offset + limit),
@@ -67,24 +85,36 @@ describe('streaming export', () => {
         async (_userId: string, _thoughtId: string, offset: number, limit: number) =>
           entries.slice(offset, offset + limit),
       ),
+      listThoughtCheckpointPage: vi.fn(
+        async (_userId: string, _thoughtId: string, offset: number, limit: number) =>
+          checkpoints.slice(offset, offset + limit),
+      ),
       listConfirmedConnectionPage: vi.fn(
         async (_userId: string, offset: number, limit: number) =>
           [confirmed].slice(offset, offset + limit),
       ),
     } satisfies Pick<
       ThoughtExportRepository,
-      'listThoughtPage' | 'listEntryPage' | 'listThoughtEntryPage' | 'listConfirmedConnectionPage'
+      | 'listThoughtPage'
+      | 'listCollectionPage'
+      | 'listCheckpointPage'
+      | 'listEntryPage'
+      | 'listThoughtEntryPage'
+      | 'listThoughtCheckpointPage'
+      | 'listConfirmedConnectionPage'
     >
   }
 
-  it('produces parseable retniw.export.v1 data across page boundaries', async () => {
+  it('produces parseable retniw.export.v2 data across page boundaries', async () => {
     const source = repository()
     const text = await new Response(
       createFullExportStream(source, userId, '2026-08-20T02:00:00.000Z'),
     ).text()
     const exported = JSON.parse(text)
 
-    expect(exported.format).toBe('retniw.export.v1')
+    expect(exported.format).toBe('retniw.export.v2')
+    expect(exported.collections).toEqual(collections)
+    expect(exported.checkpoints).toEqual(checkpoints)
     expect(exported.entries).toHaveLength(501)
     expect(exported.entries[0].content).toBe('外部原文\n第二行')
     expect(exported.connections).toEqual([confirmed])
@@ -102,6 +132,8 @@ describe('streaming export', () => {
     expect(markdown).toContain('作者：导入')
     expect(markdown).toContain('来源：来源.md')
     expect(markdown).toContain('外部原文\n第二行')
+    expect(markdown).toContain('先到这里')
+    expect(markdown).toContain('下次从这里接着想。')
     expect(source.listThoughtEntryPage).toHaveBeenNthCalledWith(2, userId, thoughtId, 500, 500)
   })
 })

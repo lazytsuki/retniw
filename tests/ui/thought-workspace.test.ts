@@ -13,6 +13,9 @@ describe('thought workspace acceptance boundaries', () => {
       createdAt: new Date(Date.UTC(2026, 7, 20, 0, index)).toISOString(),
       lastActivityAt: new Date(Date.UTC(2026, 7, 20, 0, index)).toISOString(),
       relationCheckedAt: null,
+      collectionId: null,
+      archivedAt: null,
+      deletedAt: null,
       firstEntry: null,
     })
     const firstPage = Array.from({ length: 20 }, (_, index) => summary(index))
@@ -91,6 +94,7 @@ describe('thought workspace acceptance boundaries', () => {
     const capturePage = await readFile('app/page.tsx', 'utf8')
     const header = await readFile('src/components/app-header.tsx', 'utf8')
     const navigation = await readFile('src/components/thoughts/thought-navigation.tsx', 'utf8')
+    const listItem = await readFile('src/components/thoughts/thought-list-item.tsx', 'utf8')
     const workspace = await readFile('src/components/thoughts/thought-workspace.tsx', 'utf8')
     const assist = await readFile('src/components/thoughts/thinking-assist.tsx', 'utf8')
     const menu = await readFile('src/components/thoughts/thought-menu.tsx', 'utf8')
@@ -103,10 +107,10 @@ describe('thought workspace acceptance boundaries', () => {
     expect(navigation).toContain('以前的想法')
     expect(navigation).not.toContain('当前想法')
     expect(navigation).toContain('看看有没有联系')
-    expect(navigation).toContain("/api/thoughts?cursor=")
+    expect(navigation).toContain("params.set('cursor', cursor)")
     expect(navigation).toContain("sessionStorage.setItem(explicitNewThoughtKey, '1')")
-    expect(navigation).toContain("timeZone: 'Asia/Shanghai'")
-    expect(navigation).toContain('prefetch={false}')
+    expect(listItem).toContain("timeZone: 'Asia/Shanghai'")
+    expect(listItem).toContain('prefetch={false}')
     expect(workspace).toContain('写下你正在想的。')
     expect(workspace).toMatch(/entries\.length > 0 && \([\s\S]*<ThinkingAssist/)
     expect(workspace).toContain('if (item.thoughtId !== thoughtId) return')

@@ -1,26 +1,24 @@
-import type { User } from '@supabase/supabase-js'
 import { ApiError } from '@/src/lib/api-error'
+
+export type AuthenticatedUser = { id: string }
 
 export type AuthClient = {
   auth: {
-    getUser: () => Promise<{
-      data: { user: User | null }
+    getClaims: () => Promise<{
+      data: { claims: { sub?: string } | null }
       error: { message: string } | null
     }>
   }
 }
 
-export async function requireUser(authClient?: AuthClient): Promise<User> {
+export async function requireUser(authClient?: AuthClient): Promise<AuthenticatedUser> {
   const client =
     authClient ?? (await (await import('@/src/lib/supabase/server')).createServerAuthClient())
-  const {
-    data: { user },
-    error,
-  } = await client.auth.getUser()
+  const { data, error } = await client.auth.getClaims()
 
-  if (error || !user) {
+  if (error || !data?.claims?.sub) {
     throw new ApiError(401, 'UNAUTHENTICATED', 'Authentication required')
   }
 
-  return user
+  return { id: data.claims.sub }
 }

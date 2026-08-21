@@ -7,7 +7,13 @@ export type ExportThought = {
   id: string
   createdAt: string
   lastActivityAt: string
+  collectionId: string | null
+  archivedAt: string | null
+  deletedAt: string | null
 }
+
+export type ExportCollection = { id: string; name: string; createdAt: string; updatedAt: string }
+export type ExportCheckpoint = { id: string; thoughtId: string; note: string; createdAt: string }
 
 export type ExportEntry = {
   id: string
@@ -34,7 +40,13 @@ type ThoughtRow = {
   id: string
   created_at: string
   last_activity_at: string
+  collection_id: string | null
+  archived_at: string | null
+  deleted_at: string | null
 }
+
+type CollectionRow = { id: string; name: string; created_at: string; updated_at: string }
+type CheckpointRow = { id: string; thought_id: string; note: string; created_at: string }
 
 type EntryRow = {
   id: string
@@ -63,7 +75,7 @@ export class ThoughtExportRepository {
   async listThoughtPage(userId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
     const { data, error } = await this.client
       .from('thoughts')
-      .select('id,created_at,last_activity_at')
+      .select('id,created_at,last_activity_at,collection_id,archived_at,deleted_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
@@ -74,7 +86,50 @@ export class ThoughtExportRepository {
       id: row.id,
       createdAt: row.created_at,
       lastActivityAt: row.last_activity_at,
+      collectionId: row.collection_id,
+      archivedAt: row.archived_at,
+      deletedAt: row.deleted_at,
     }))
+  }
+
+  async listCollectionPage(userId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
+    const { data, error } = await this.client
+      .from('thought_collections')
+      .select('id,name,created_at,updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + limit - 1)
+      .returns<CollectionRow[]>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to export collections')
+    return data.map((row) => ({ id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at }))
+  }
+
+  async listCheckpointPage(userId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
+    const { data, error } = await this.client
+      .from('thought_checkpoints')
+      .select('id,thought_id,note,created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + limit - 1)
+      .returns<CheckpointRow[]>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to export checkpoints')
+    return data.map((row) => ({ id: row.id, thoughtId: row.thought_id, note: row.note, createdAt: row.created_at }))
+  }
+
+  async listThoughtCheckpointPage(userId: string, thoughtId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
+    const { data, error } = await this.client
+      .from('thought_checkpoints')
+      .select('id,thought_id,note,created_at')
+      .eq('user_id', userId)
+      .eq('thought_id', thoughtId)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + limit - 1)
+      .returns<CheckpointRow[]>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to export thought checkpoints')
+    return data.map((row) => ({ id: row.id, thoughtId: row.thought_id, note: row.note, createdAt: row.created_at }))
   }
 
   async listEntryPage(userId: string, offset: number, limit = EXPORT_PAGE_SIZE) {

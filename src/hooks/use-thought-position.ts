@@ -30,7 +30,7 @@ export function parseThoughtPosition(value: string | null): ThoughtPosition | nu
   return null
 }
 
-export function useThoughtPosition(thoughtId: string, content: string) {
+export function useThoughtPosition(thoughtId: string, content: string, fallbackElementId?: string) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const restoredId = useRef<string | null>(null)
   const navigationStarted = useRef(false)
@@ -83,8 +83,11 @@ export function useThoughtPosition(thoughtId: string, content: string) {
     if (restoredId.current === thoughtId) return
     const saved = parseThoughtPosition(sessionStorage.getItem(thoughtPositionKey(thoughtId)))
     if (!saved) {
-      restoredId.current = thoughtId
-      return
+      const frame = requestAnimationFrame(() => {
+        if (fallbackElementId) document.getElementById(fallbackElementId)?.scrollIntoView({ block: 'center' })
+        restoredId.current = thoughtId
+      })
+      return () => cancelAnimationFrame(frame)
     }
     let innerFrame = 0
     const frame = requestAnimationFrame(() => {
@@ -102,7 +105,7 @@ export function useThoughtPosition(thoughtId: string, content: string) {
       cancelAnimationFrame(frame)
       cancelAnimationFrame(innerFrame)
     }
-  }, [content, thoughtId])
+  }, [content, fallbackElementId, thoughtId])
 
   return textareaRef as RefObject<HTMLTextAreaElement | null>
 }

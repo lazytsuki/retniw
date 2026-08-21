@@ -29,6 +29,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     })
 
     await thoughts.touch(user.id, thoughtId, result.entry.createdAt)
+    await thoughts.setSummaryIfEmpty(user.id, thoughtId, result.entry)
     return NextResponse.json({ data: { entry: result.entry } }, { status: result.created ? 201 : 200 })
   } catch (error) {
     return apiErrorResponse(error)

@@ -73,6 +73,9 @@ export function ImportTextDialog({ open, currentAllowed, onClose, onImport }: Im
         event.preventDefault()
         close()
       }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) close()
+      }}
       onClose={() => {
         if (open && !saving) onClose()
       }}

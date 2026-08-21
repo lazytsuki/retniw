@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   ensure: vi.fn(),
   getOwned: vi.fn(),
   touch: vi.fn(),
+  setSummaryIfEmpty: vi.fn(),
   listRecent: vi.fn(),
   getDetail: vi.fn(),
   createEntry: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('@/src/server/repositories/thought-repository', () => ({
     ensure = mocks.ensure
     getOwned = mocks.getOwned
     touch = mocks.touch
+    setSummaryIfEmpty = mocks.setSummaryIfEmpty
     listRecent = mocks.listRecent
     getDetail = mocks.getDetail
   },
@@ -82,6 +84,7 @@ beforeEach(() => {
   mocks.ensure.mockResolvedValue({ thought, created: true })
   mocks.getOwned.mockResolvedValue(thought)
   mocks.touch.mockResolvedValue(undefined)
+  mocks.setSummaryIfEmpty.mockResolvedValue(undefined)
   mocks.createEntry.mockResolvedValue({ entry, created: true })
   mocks.decodeThoughtCursor.mockReturnValue({ lastActivityAt: createdAt, id: ids.thought })
 })
@@ -151,6 +154,9 @@ describe('thought list route', () => {
     expect(mocks.listRecent).toHaveBeenCalledWith(ids.user, {
       lastActivityAt: createdAt,
       id: ids.thought,
+    }, {
+      scope: 'active',
+      collectionId: undefined,
     })
     expect((await response.json()).data).toEqual(result)
   })
