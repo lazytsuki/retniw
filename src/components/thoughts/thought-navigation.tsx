@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import type { ThoughtSummary } from './thought-workspace'
@@ -49,7 +48,6 @@ function ThoughtList({
   loading,
   loadError,
   onChoose,
-  onIntent,
   onLoadMore,
   onNavigate,
   thoughts,
@@ -60,7 +58,6 @@ function ThoughtList({
   loading: boolean
   loadError: string
   onChoose?: () => void
-  onIntent: (thoughtId: string) => void
   onLoadMore: () => void
   onNavigate: (thoughtId: string) => void
   thoughts: ThoughtSummary[]
@@ -95,8 +92,6 @@ function ThoughtList({
               }
               onChoose?.()
             }}
-            onFocus={() => onIntent(thought.id)}
-            onPointerEnter={() => onIntent(thought.id)}
           >
             <span>{thoughtExcerpt(thought)}</span>
             <time dateTime={thought.lastActivityAt}>
@@ -131,7 +126,6 @@ export function ThoughtNavigation({
   relationRunning,
   onFindRelations,
 }: ThoughtNavigationProps) {
-  const router = useRouter()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [additionalThoughts, setAdditionalThoughts] = useState<ThoughtSummary[]>([])
   const [nextCursor, setNextCursor] = useState(initialNextCursor)
@@ -152,10 +146,6 @@ export function ThoughtNavigation({
     if (historyOpen && !dialog.open) dialog.showModal()
     if (!historyOpen && dialog.open) dialog.close()
   }, [historyOpen])
-
-  function prepareThought(thoughtId: string) {
-    if (thoughtId !== activeThoughtId) router.prefetch(`/thoughts/${thoughtId}`)
-  }
 
   function openNewThought(event: MouseEvent<HTMLAnchorElement>) {
     if (!currentStarted) {
@@ -194,7 +184,6 @@ export function ThoughtNavigation({
       loading={loading}
       loadError={loadError}
       onChoose={() => setHistoryOpen(false)}
-      onIntent={prepareThought}
       onLoadMore={() => void loadMore()}
       onNavigate={setNavigatingThoughtId}
       thoughts={allThoughts}
