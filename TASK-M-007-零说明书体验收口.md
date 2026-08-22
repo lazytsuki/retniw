@@ -4,9 +4,7 @@
 - 模块目标：让首次用户不看说明也能完成新建、继续、回看和另起想法，并明确感知 AI 只是按需工具。
 - 模块边界：包含统一工作区导航、首次空白状态、按需 AI 层级、所有想法分页、移动与桌面适配及必要文档同步；不新增标题、标签、文件夹、搜索、聊天或数据结构。
 - 模块依赖：M-002、M-003、M-004、M-005、M-006
-- 当前说明：本文件记录已完成的M-007基础工作区。现网反馈追加的浮层、合集、归档/删除、停靠、生命周期一致性和公开自注册分别由`tasks-v23/M-008`至`M-012`继续收口；这些扩展已通过发布前门禁，但正式域名动态回放尚未完成，不复用本文件的历史完成标记。
-- 本轮发布前证据：19个测试文件、117项测试及typecheck、lint、build、依赖高危审计、diff检查通过；生产数据库第二迁移和公开注册开关已读回；Chromium覆盖320、375、768、1024、1440像素及菜单、手势、竞态和乐观动作。
-- 本轮待完成证据：Vercel本轮部署、合集动态完整链路、checkpoint动态链路、登录后WebKit主链、正式域名双账号隔离与临时数据清理。
+- 当前说明：本文件记录已完成的M-007基础工作区；现网反馈追加的浮层、合集、归档/删除、停靠、生命周期一致性和公开自注册由`tasks-v23/M-008`至`M-012`收口，并已在同一生产版本完成。详细证据见[`tasks-v23/TASK-STATUS.md`](tasks-v23/TASK-STATUS.md)和[`上线checkList-M007.md`](上线checkList-M007.md)。
 
 ## 任务卡
 ### M-007-T-001 交付不用说明书的想法工作区
@@ -24,7 +22,7 @@
   4. 在 [ThoughtComposer](src/components/thoughts/thought-composer.tsx#ThoughtComposer)根据是否已有内容切换“写在这里/接着写”；在 [ImportTextDialog](src/components/thoughts/import-text-dialog.tsx#ImportTextDialog)与 [ExportMenu](src/components/thoughts/export-menu.tsx#ExportMenu)统一使用“想法”而非“过程”。
   5. 在 [ThoughtWorkspace](src/components/thoughts/thought-workspace.tsx#ThoughtWorkspace)仅于已有用户内容时渲染“帮我接着想”；服务端自行选择问一句或给一个角度，不再输出“可以继续写”前缀。整理进入更多操作，找联系进入旧想法区域；关系候选只使用user/import entries，不能把AI输出当作用户想法。
   6. 在 [global styles](src/index.css#thought-layout)实现桌面侧栏、移动常驻导航和所有想法面板，确保导航不遮住输入，保持正文平面、高可读且无横向溢出；同步调整 [ThoughtSkeleton](src/components/thoughts/thought-skeleton.tsx#ThoughtSkeleton)避免切换时布局突变。
-  7. 用 [workspace acceptance tests](tests/ui/thought-workspace.test.ts#thought-workspace)和 [composer tests](tests/workspace/composer.test.ts#thought-composer)覆盖结构与状态边界，并在 [README](README.md#retniw)把内测入口统一为`https://retniw.cn`，将旧`vercel.app`说明为永久跳转的备用地址。
+  7. 用 [workspace acceptance tests](tests/ui/thought-workspace.test.ts#thought-workspace)和 [composer tests](tests/workspace/composer.test.ts#thought-composer)覆盖结构与状态边界，并在 [README](README.md#retniw)把内测入口统一为`https://retniw.cn`；旧`vercel.app`只记录Vercel边缘HTTP 308与大陆DNS边界，不再作为可用入口。
   8. 根据现网反馈修正左栏滚动所有权：侧栏只允许纵向滚动，历史项不再横移；关闭历史详情的批量预取，详情与AI前置查询改为并行，点击后立即在原入口显示状态。
 - 边界与不变约束：失败、兼容与明确不变行为如下。
   - [x] 历史为空、超过二十条或加载失败时都不能失去写新想法入口和当前主区；列表只读取当前账号，不能用客户端隐藏替代服务端所有权校验。

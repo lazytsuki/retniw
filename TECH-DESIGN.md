@@ -101,9 +101,9 @@ flowchart TD
 - 需求/验收：点击100毫秒内出现就地状态；切换详情不整块替换导航和已显示内容。
 - 实现目标：`retniw-web`，减轻已定位的等待感，不增加批量预取。
 - 现状逻辑与代码证据：[`ThoughtSkeleton`](src/components/thoughts/thought-skeleton.tsx#ThoughtSkeleton)由详情段`loading.tsx`渲染并替换整个工作区；[`ThoughtNavigation`](src/components/thoughts/thought-navigation.tsx#ThoughtNavigation)中的历史链接已禁用批量预取并显示“正在打开”。
-- 增量修改：移除详情段整页`loading.tsx`，保留当前已渲染工作区直到新路由提交；历史条目在点击同一帧进入`aria-busy`。菜单、滑动和乐观列表操作全部先本地反馈，再等待请求。
+- 增量修改：移除详情段整页`loading.tsx`，保留当前已渲染工作区直到新路由提交；历史条目在点击同一帧进入`aria-busy`。菜单、滑动和乐观列表操作全部先本地反馈，再等待请求。首次保存后必须通过 Next 路由进入`/thoughts/:id`对应的路由树，不得只调用 History API 改写地址；checkpoint 返回`/`后必须挂载新的空白首页工作区。
 - 受影响符号：`ThoughtNavigation`、`app/thoughts/[id]/loading.tsx`
-- 验证入口：慢速网络切换长想法，录制点击至状态出现时间；断言导航和旧正文未被骨架覆盖，只有一个详情RSC请求。
+- 验证入口：慢速网络切换长想法，录制点击至状态出现时间；断言导航和旧正文未被骨架覆盖，只有一个详情RSC请求；回放`/`首次保存、进入`/thoughts/:id`、checkpoint 返回`/`、Back 重开和再次写新想法，确认路由树与工作区状态一致。
 
 ### 后端与数据
 
