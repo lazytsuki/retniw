@@ -34,6 +34,28 @@ async function writePaged<T>(
   }
 }
 
+async function* readPaged<T>(readPage: (offset: number, limit: number) => Promise<T[]>) {
+  let offset = 0
+  while (true) {
+    const page = await readPage(offset, EXPORT_PAGE_SIZE)
+    for (const item of page) yield item
+    if (page.length < EXPORT_PAGE_SIZE) return
+    offset += page.length
+  }
+}
+
+async function nextItem<T>(iterator: AsyncIterator<T>) {
+  const result = await iterator.next()
+  return result.done ? null : result.value
+}
+
+function compareTimelineItems(
+  left: { createdAt: string; id: string },
+  right: { createdAt: string; id: string },
+) {
+  return left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)
+}
+
 export function createFullExportStream(
   repository: ExportRepository,
   userId: string,
@@ -89,40 +111,29 @@ export function createThoughtMarkdownStream(
         controller.enqueue(
           encoder.encode(`# retniw\n\n- 过程 ID：${thoughtId}\n- 创建时间：${createdAt}\n`),
         )
-        let offset = 0
-        while (true) {
-          const page = await repository.listThoughtEntryPage(
-            userId,
-            thoughtId,
-            offset,
-            EXPORT_PAGE_SIZE,
-          )
-          for (const entry of page) {
+        const entries = readPaged((offset, limit) =>
+          repository.listThoughtEntryPage(userId, thoughtId, offset, limit),
+        )[Symbol.asyncIterator]()
+        const checkpoints = readPaged((offset, limit) =>
+          repository.listThoughtCheckpointPage(userId, thoughtId, offset, limit),
+        )[Symbol.asyncIterator]()
+        let [entry, checkpoint] = await Promise.all([nextItem(entries), nextItem(checkpoints)])
+
+        while (entry || checkpoint) {
+          if (entry && (!checkpoint || compareTimelineItems(entry, checkpoint) <= 0)) {
             const source = entry.sourceLabel ? `\n- 来源：${entry.sourceLabel}` : ''
             controller.enqueue(
               encoder.encode(
                 `\n## ${entry.createdAt}\n\n- 条目 ID：${entry.id}\n- 作者：${entryAuthor(entry)}${source}\n\n${entry.content}\n`,
               ),
             )
-          }
-          if (page.length < EXPORT_PAGE_SIZE) break
-          offset += page.length
-        }
-        offset = 0
-        while (true) {
-          const page = await repository.listThoughtCheckpointPage(
-            userId,
-            thoughtId,
-            offset,
-            EXPORT_PAGE_SIZE,
-          )
-          for (const checkpoint of page) {
+            entry = await nextItem(entries)
+          } else if (checkpoint) {
             controller.enqueue(
               encoder.encode(`\n## 先到这里 · ${checkpoint.createdAt}\n\n${checkpoint.note || '（未留备注）'}\n`),
             )
+            checkpoint = await nextItem(checkpoints)
           }
-          if (page.length < EXPORT_PAGE_SIZE) break
-          offset += page.length
         }
         controller.close()
       } catch (error) {

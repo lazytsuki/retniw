@@ -3,11 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOverlayController } from '@/src/components/overlay-provider'
 
+type CheckpointRequestIds = { entryId: string; clientRequestId: string }
+
+function nextRequestIds(): CheckpointRequestIds {
+  return { entryId: crypto.randomUUID(), clientRequestId: crypto.randomUUID() }
+}
+
 export function CheckpointDialog({ open, onSave }: {
   open: boolean
-  onSave: (note: string) => Promise<void>
+  onSave: (note: string, requestIds: CheckpointRequestIds) => Promise<void>
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const requestIdsRef = useRef<CheckpointRequestIds | null>(null)
+  const savingRef = useRef(false)
   const overlay = useOverlayController()
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
@@ -16,7 +24,10 @@ export function CheckpointDialog({ open, onSave }: {
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
+    if (open && !dialog.open) {
+      requestIdsRef.current ??= nextRequestIds()
+      dialog.showModal()
+    }
     if (!open && dialog.open) dialog.close()
   }, [open])
 
@@ -24,19 +35,26 @@ export function CheckpointDialog({ open, onSave }: {
     if (saving) return
     setNote('')
     setError('')
+    requestIdsRef.current = null
     overlay.close('checkpoint')
   }
 
   async function submit() {
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setError('')
+    const requestIds = requestIdsRef.current ?? nextRequestIds()
+    requestIdsRef.current = requestIds
     try {
-      await onSave(note.trim())
+      await onSave(note.trim(), requestIds)
       setNote('')
+      requestIdsRef.current = null
       overlay.close('checkpoint')
     } catch {
       setError('没有保存，可以重试。')
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -51,11 +69,11 @@ export function CheckpointDialog({ open, onSave }: {
     >
       <header><h2>先到这里</h2><button type="button" onClick={close}>关闭</button></header>
       <label>
-        留一句（可不填）
-        <textarea autoFocus maxLength={500} placeholder="下次从哪里接着想" value={note} onChange={(event) => setNote(event.target.value)} />
+        下次从哪里接着想？（可不填）
+        <textarea autoFocus maxLength={500} placeholder="写一句提醒" value={note} onChange={(event) => setNote(event.target.value)} />
       </label>
       {error && <p role="alert">{error}</p>}
-      <button type="button" disabled={saving} onClick={() => void submit()}>{saving ? '正在保存' : '先到这里'}</button>
+      <button type="button" disabled={saving} onClick={() => void submit()}>{saving ? '正在保存' : '回到全部想法'}</button>
     </dialog>
   )
 }

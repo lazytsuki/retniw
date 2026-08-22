@@ -1,8 +1,9 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ApiError } from '@/src/lib/api-error'
 import { requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
+import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 import { ThoughtWorkspace } from '@/src/components/thoughts/thought-workspace'
 import { AppHeader } from '@/src/components/app-header'
 
@@ -11,7 +12,14 @@ export const dynamic = 'force-dynamic'
 type ThoughtPageProps = { params: Promise<{ id: string }> }
 
 export default async function ThoughtPage({ params }: ThoughtPageProps) {
-  const { id } = await params
+  const { id: rawId } = await params
+  let id: string
+  try {
+    id = requireUuid(rawId, 'id')
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400) notFound()
+    throw error
+  }
   let data: Awaited<ReturnType<ThoughtRepository['getDetail']>>
   let recent: Awaited<ReturnType<ThoughtRepository['listRecent']>>
   try {

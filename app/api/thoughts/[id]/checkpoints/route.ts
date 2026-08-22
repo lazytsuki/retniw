@@ -4,7 +4,7 @@ import { requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { CheckpointRepository } from '@/src/server/repositories/checkpoint-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
-import { parseCheckpointInput } from '@/src/server/thoughts/parse-thought-management'
+import { parseCheckpointInput, requireUuid } from '@/src/server/thoughts/parse-thought-management'
 
 export const runtime = 'nodejs'
 type RouteContext = { params: Promise<{ id: string }> }
@@ -12,7 +12,8 @@ type RouteContext = { params: Promise<{ id: string }> }
 export async function POST(request: Request, { params }: RouteContext) {
   try {
     const user = await requireUser()
-    const { id: thoughtId } = await params
+    const { id: rawThoughtId } = await params
+    const thoughtId = requireUuid(rawThoughtId, 'id')
     const input = parseCheckpointInput(await request.json().catch(() => null))
     const client = createServiceClient()
     await new ThoughtRepository(client).getOwned(user.id, thoughtId)

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getOwned: vi.fn(),
   touch: vi.fn(),
   setSummaryIfEmpty: vi.fn(),
+  updateAction: vi.fn(),
   listRecent: vi.fn(),
   getDetail: vi.fn(),
   createEntry: vi.fn(),
@@ -17,6 +18,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
 vi.mock('@/src/lib/supabase/service', () => ({ createServiceClient: () => ({}) }))
+vi.mock('@/src/components/app-header', () => ({ AppHeader: () => null }))
+vi.mock('@/src/components/thoughts/thought-workspace', () => ({ ThoughtWorkspace: () => null }))
 vi.mock('@/src/server/repositories/thought-repository', () => ({
   decodeThoughtCursor: mocks.decodeThoughtCursor,
   ThoughtRepository: class {
@@ -24,6 +27,7 @@ vi.mock('@/src/server/repositories/thought-repository', () => ({
     getOwned = mocks.getOwned
     touch = mocks.touch
     setSummaryIfEmpty = mocks.setSummaryIfEmpty
+    updateAction = mocks.updateAction
     listRecent = mocks.listRecent
     getDetail = mocks.getDetail
   },
@@ -37,6 +41,9 @@ vi.mock('@/src/server/repositories/entry-repository', () => ({
 
 import { GET as listThoughts, POST as createThought } from '@/app/api/thoughts/route'
 import { POST as appendEntry } from '@/app/api/thoughts/[id]/entries/route'
+import { GET as exportThought } from '@/app/api/thoughts/[id]/export.md/route'
+import { GET as getThought, PATCH as updateThought } from '@/app/api/thoughts/[id]/route'
+import ThoughtPage from '@/app/thoughts/[id]/page'
 
 const ids = {
   user: '018f6f3a-a1c2-47a8-8f1e-100000000001',
@@ -159,5 +166,60 @@ describe('thought list route', () => {
       collectionId: undefined,
     })
     expect((await response.json()).data).toEqual(result)
+  })
+})
+
+describe('thought management route', () => {
+  it('rejects an invalid detail path id before calling the repository', async () => {
+    const response = await getThought(
+      new Request('http://localhost/api/thoughts/not-a-uuid'),
+      { params: Promise.resolve({ id: 'not-a-uuid' }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.getDetail).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid path id before calling the repository', async () => {
+    const response = await updateThought(
+      new Request('http://localhost/api/thoughts/not-a-uuid', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' }),
+      }),
+      { params: Promise.resolve({ id: 'not-a-uuid' }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.updateAction).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid entry path id before calling the repository', async () => {
+    const response = await appendEntry(request(body), {
+      params: Promise.resolve({ id: 'not-a-uuid' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(mocks.getOwned).not.toHaveBeenCalled()
+    expect(mocks.createEntry).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid Markdown export path id before calling the repository', async () => {
+    const response = await exportThought(
+      new Request('http://localhost/api/thoughts/not-a-uuid/export.md'),
+      { params: Promise.resolve({ id: 'not-a-uuid' }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.getOwned).not.toHaveBeenCalled()
+  })
+
+  it('renders an invalid thought page path as not found without querying', async () => {
+    await expect(ThoughtPage({
+      params: Promise.resolve({ id: 'not-a-uuid' }),
+    })).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
+
+    expect(mocks.requireUser).not.toHaveBeenCalled()
+    expect(mocks.getDetail).not.toHaveBeenCalled()
   })
 })

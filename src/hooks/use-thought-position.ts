@@ -6,6 +6,7 @@ export type ThoughtPosition = {
   scrollY: number
   selectionStart: number
   selectionEnd: number
+  updatedAt: number
 }
 
 export function thoughtPositionKey(thoughtId: string) {
@@ -24,13 +25,36 @@ export function parseThoughtPosition(value: string | null): ThoughtPosition | nu
       typeof parsed.selectionEnd === 'number' &&
       parsed.selectionEnd >= parsed.selectionStart
     ) {
-      return parsed as ThoughtPosition
+      return {
+        scrollY: parsed.scrollY,
+        selectionStart: parsed.selectionStart,
+        selectionEnd: parsed.selectionEnd,
+        updatedAt: typeof parsed.updatedAt === 'number' && parsed.updatedAt >= 0
+          ? parsed.updatedAt
+          : 0,
+      }
     }
   } catch {}
   return null
 }
 
-export function useThoughtPosition(thoughtId: string, content: string, fallbackElementId?: string) {
+export function savedPositionIsNewer(
+  saved: ThoughtPosition | null,
+  fallbackCreatedAt?: string,
+) {
+  if (!saved) return false
+  if (!fallbackCreatedAt) return true
+  const fallbackTime = Date.parse(fallbackCreatedAt)
+  if (Number.isNaN(fallbackTime)) return true
+  return saved.updatedAt > fallbackTime
+}
+
+export function useThoughtPosition(
+  thoughtId: string,
+  content: string,
+  fallbackElementId?: string,
+  fallbackCreatedAt?: string,
+) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const restoredId = useRef<string | null>(null)
   const navigationStarted = useRef(false)
@@ -44,6 +68,7 @@ export function useThoughtPosition(thoughtId: string, content: string, fallbackE
         scrollY: window.scrollY,
         selectionStart: textarea?.selectionStart ?? 0,
         selectionEnd: textarea?.selectionEnd ?? 0,
+        updatedAt: Date.now(),
       }
       sessionStorage.setItem(thoughtPositionKey(thoughtId), JSON.stringify(position))
     }
@@ -58,7 +83,9 @@ export function useThoughtPosition(thoughtId: string, content: string, fallbackE
       const anchor = target.closest('a[href]')
       if (!anchor || anchor.hasAttribute('download')) return
       save()
-      navigationStarted.current = true
+      queueMicrotask(() => {
+        if (!event.defaultPrevented) navigationStarted.current = true
+      })
     }
     const preserveBeforeHistoryNavigation = () => {
       save()
@@ -82,7 +109,7 @@ export function useThoughtPosition(thoughtId: string, content: string, fallbackE
   useEffect(() => {
     if (restoredId.current === thoughtId) return
     const saved = parseThoughtPosition(sessionStorage.getItem(thoughtPositionKey(thoughtId)))
-    if (!saved) {
+    if (!saved || !savedPositionIsNewer(saved, fallbackCreatedAt)) {
       const frame = requestAnimationFrame(() => {
         if (fallbackElementId) document.getElementById(fallbackElementId)?.scrollIntoView({ block: 'center' })
         restoredId.current = thoughtId
@@ -105,7 +132,7 @@ export function useThoughtPosition(thoughtId: string, content: string, fallbackE
       cancelAnimationFrame(frame)
       cancelAnimationFrame(innerFrame)
     }
-  }, [content, fallbackElementId, thoughtId])
+  }, [content, fallbackCreatedAt, fallbackElementId, thoughtId])
 
   return textareaRef as RefObject<HTMLTextAreaElement | null>
 }

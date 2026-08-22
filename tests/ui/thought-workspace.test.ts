@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { parseThoughtPosition, thoughtPositionKey } from '@/src/hooks/use-thought-position'
+import { parseThoughtPosition, savedPositionIsNewer, thoughtPositionKey } from '@/src/hooks/use-thought-position'
 import { isMarkdownContent, markdownToPlainText } from '@/src/lib/markdown'
 import { aiOutputForDisplay } from '@/src/lib/ai-output'
 import { mergeThoughts } from '@/src/components/thoughts/thought-navigation'
@@ -30,13 +30,29 @@ describe('thought workspace acceptance boundaries', () => {
 
   it('restores only a valid position for the same thought', () => {
     expect(thoughtPositionKey('thought-1')).toBe('retniw:thought-position:thought-1')
-    expect(parseThoughtPosition('{"scrollY":320,"selectionStart":4,"selectionEnd":7}')).toEqual({
+    expect(parseThoughtPosition('{"scrollY":320,"selectionStart":4,"selectionEnd":7,"updatedAt":2000}')).toEqual({
       scrollY: 320,
       selectionStart: 4,
       selectionEnd: 7,
+      updatedAt: 2000,
     })
+    expect(parseThoughtPosition('{"scrollY":320,"selectionStart":4,"selectionEnd":7}')?.updatedAt).toBe(0)
     expect(parseThoughtPosition('{"scrollY":-1,"selectionStart":0,"selectionEnd":0}')).toBeNull()
     expect(parseThoughtPosition('broken')).toBeNull()
+  })
+
+  it('lets the newer of a checkpoint and a manual reading position win', () => {
+    const saved = { scrollY: 320, selectionStart: 0, selectionEnd: 0, updatedAt: 2_000 }
+    expect(savedPositionIsNewer(saved, new Date(1_000).toISOString())).toBe(true)
+    expect(savedPositionIsNewer(saved, new Date(3_000).toISOString())).toBe(false)
+    expect(savedPositionIsNewer(saved)).toBe(true)
+  })
+
+  it('does not stop position saves when a link click is cancelled in the bubble phase', async () => {
+    const positionHook = await readFile('src/hooks/use-thought-position.ts', 'utf8')
+    const saveBeforeDeferredDecision = positionHook.indexOf('save()\n      queueMicrotask')
+    expect(saveBeforeDeferredDecision).toBeGreaterThan(-1)
+    expect(positionHook).toContain('if (!event.defaultPrevented) navigationStarted.current = true')
   })
 
   it('keeps API and export responses outside Service Worker caching', async () => {
@@ -139,6 +155,65 @@ describe('thought workspace acceptance boundaries', () => {
     expect(sidebarRule).toContain('overflow-x: hidden')
     expect(sidebarRule).toContain('overflow-y: auto')
     expect(css).not.toMatch(/\.thought-link:hover \{[\s\S]*?translateX/)
+  })
+
+  it('keeps transient thought actions outside clipped list rows', async () => {
+    const actionMenu = await readFile('src/components/thoughts/thought-action-menu.tsx', 'utf8')
+    const listItem = await readFile('src/components/thoughts/thought-list-item.tsx', 'utf8')
+    const navigation = await readFile('src/components/thoughts/thought-navigation.tsx', 'utf8')
+    const overlayProvider = await readFile('src/components/overlay-provider.tsx', 'utf8')
+    const css = await readFile('src/index.css', 'utf8')
+
+    expect(actionMenu).toContain("import { createPortal } from 'react-dom'")
+    expect(actionMenu).toContain("document.getElementById('thought-history-layer-root')")
+    expect(actionMenu).toContain('createPortal(actionLayer, portalTarget)')
+    expect(navigation).toContain('id="thought-history-layer-root"')
+    expect(css).toMatch(/\.thought-list-item \{[\s\S]*?overflow: hidden;/)
+    expect(css).toMatch(/\.thought-list-item__swipe-actions\[aria-hidden="true"\] \{[\s\S]*?visibility: hidden;[\s\S]*?opacity: 0;/)
+    expect(css).toMatch(/\.thought-action-menu__panel,[\s\S]*?\.collection-picker-layer \{[\s\S]*?position: fixed;/)
+    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.thought-action-menu__panel,[\s\S]*?inset: auto 0 0;/)
+    expect(overlayProvider).toMatch(/window\.setTimeout\(\(\) => \{[\s\S]*?triggerRef\.current = null/)
+    expect(overlayProvider).toContain('if (activeIdRef.current !== null) return')
+    expect(overlayProvider).toContain('focusHasNowhereUsefulToGo')
+    expect(overlayProvider).toContain('window.requestAnimationFrame')
+    expect(overlayProvider).toMatch(/event\.key !== 'Escape'[\s\S]*?event\.preventDefault\(\)[\s\S]*?overlay\.close\(id\)/)
+    expect(actionMenu).toContain("'[role=\"menuitem\"]:not(:disabled)'")
+    expect(actionMenu).toContain("['ArrowDown', 'ArrowUp', 'Home', 'End']")
+    expect(actionMenu).toContain('onKeyDown={navigateMenu}')
+    expect(actionMenu).toContain("?.focus({ preventScroll: true })")
+    expect(listItem).toContain('if (longPressOpened.current)')
+    expect(listItem).toContain("document.getElementById(`${menuId}:panel`)")
+    expect(listItem).toContain("transition: itemOverlayOpen ? 'none' : undefined")
+  })
+
+  it('separates history, swipe state, recovery, and destructive confirmations', async () => {
+    const navigation = await readFile('src/components/thoughts/thought-navigation.tsx', 'utf8')
+    const listItem = await readFile('src/components/thoughts/thought-list-item.tsx', 'utf8')
+    const checkpoint = await readFile('src/components/thoughts/checkpoint-dialog.tsx', 'utf8')
+
+    expect(navigation).toContain('const [historyOpen, setHistoryOpen] = useState(false)')
+    expect(navigation).not.toContain("overlay.isOpen('history')")
+    expect(navigation).toContain('const [revealedThoughtId, setRevealedThoughtId]')
+    expect(navigation).toContain('setRevealedThoughtId(thought.id)')
+    expect(navigation).toContain('onConceal={() => setRevealedThoughtId(null)}')
+    expect(navigation).toContain('只删除合集，不会删除里面的想法。')
+    expect(listItem).toContain("mode === 'deleted' ? <button")
+    expect(listItem).toContain("onAction(thought, 'unarchive'")
+    expect(listItem).toContain('取消归档')
+    expect(checkpoint).toContain('requestIdsRef.current ??= nextRequestIds()')
+    expect(checkpoint).toContain('回到全部想法')
+  })
+
+  it('ignores stale view and load-more responses after another navigation request starts', async () => {
+    const navigation = await readFile('src/components/thoughts/thought-navigation.tsx', 'utf8')
+    expect(navigation).toContain('const viewRequestEpochRef = useRef(0)')
+    expect(navigation.match(/requestEpoch !== viewRequestEpochRef\.current/g)).toHaveLength(4)
+    expect(navigation).toContain('const requestedView = view')
+    expect(navigation).toContain('queryFor(requestedView, nextCursor)')
+    expect(navigation).toMatch(/function showRecent\(\) \{[\s\S]*?viewRequestEpochRef\.current \+= 1/)
+    expect(navigation).toMatch(/setView\(nextView\)[\s\S]*?setViewThoughts\(\[\]\)[\s\S]*?setNextCursor\(null\)[\s\S]*?setLoading\(true\)/)
+    expect(navigation).toContain('className="thought-list-loading" role="status">正在加载')
+    expect(navigation).toContain("visibleThoughts.length === 0 && !loadError")
   })
 
   it('uses the public domain as the beta entry', async () => {

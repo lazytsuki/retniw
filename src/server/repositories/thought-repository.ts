@@ -41,6 +41,10 @@ type ConnectionRecord = {
   created_at: string
 }
 
+type ThoughtAction =
+  | { action: 'move'; collectionId: string | null }
+  | { action: 'archive' | 'unarchive' | 'delete' | 'restore' }
+
 export function toThought(row: ThoughtRecord): Thought {
   return {
     id: row.id,
@@ -55,6 +59,19 @@ export function toThought(row: ThoughtRecord): Thought {
 
 export class ThoughtRepository {
   constructor(private readonly client: SupabaseClient) {}
+
+  private async getOwnedAnyState(userId: string, thoughtId: string) {
+    const { data, error } = await this.client
+      .from('thoughts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', thoughtId)
+      .maybeSingle<ThoughtRecord>()
+
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought')
+    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
+    return toThought(data)
+  }
 
   async ensure(userId: string, thoughtId: string) {
     const { data, error } = await this.client
@@ -110,6 +127,7 @@ export class ThoughtRepository {
       })
       .eq('user_id', userId)
       .eq('id', thoughtId)
+      .is('deleted_at', null)
       .is('summary_content', null)
 
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update thought summary')
@@ -191,7 +209,31 @@ export class ThoughtRepository {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought connections')
     }
 
-    const entryIds = connectionsResult.data.flatMap((connection) => [
+    let visibleConnections = connectionsResult.data
+    if (visibleConnections.length) {
+      const connectedThoughtIds = Array.from(new Set(visibleConnections.flatMap((connection) => [
+        connection.source_thought_id,
+        connection.target_thought_id,
+      ])))
+      const activeThoughts = await this.client
+        .from('thoughts')
+        .select('id')
+        .eq('user_id', userId)
+        .in('id', connectedThoughtIds)
+        .is('deleted_at', null)
+        .returns<Array<{ id: string }>>()
+      if (activeThoughts.error) {
+        throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connected thoughts')
+      }
+      const activeThoughtIds = new Set(activeThoughts.data.map((item) => item.id))
+      visibleConnections = visibleConnections.filter(
+        (connection) =>
+          activeThoughtIds.has(connection.source_thought_id) &&
+          activeThoughtIds.has(connection.target_thought_id),
+      )
+    }
+
+    const entryIds = visibleConnections.flatMap((connection) => [
       connection.source_entry_id,
       connection.target_entry_id,
     ])
@@ -214,7 +256,7 @@ export class ThoughtRepository {
       thought,
       entries,
       checkpoints,
-      connections: connectionsResult.data.map((connection) => ({
+      connections: visibleConnections.map((connection) => ({
         id: connection.id,
         sourceThoughtId: connection.source_thought_id,
         targetThoughtId: connection.target_thought_id,
@@ -231,10 +273,13 @@ export class ThoughtRepository {
   async updateAction(
     userId: string,
     thoughtId: string,
-    action:
-      | { action: 'move'; collectionId: string | null }
-      | { action: 'archive' | 'unarchive' | 'delete' | 'restore' },
+    action: ThoughtAction,
   ) {
+    const current = await this.getOwnedAnyState(userId, thoughtId)
+    if (current.deletedAt && action.action !== 'delete' && action.action !== 'restore') {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is deleted')
+    }
+
     if (action.action === 'move' && action.collectionId) {
       const collection = await this.client
         .from('thought_collections')
@@ -245,6 +290,8 @@ export class ThoughtRepository {
       if (collection.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read collection')
       if (!collection.data) throw new ApiError(404, 'NOT_FOUND', 'Collection not found')
     }
+
+    if (thoughtActionSatisfied(current, action)) return current
 
     const now = new Date().toISOString()
     const values = action.action === 'move'
@@ -262,12 +309,40 @@ export class ThoughtRepository {
       .update(values)
       .eq('user_id', userId)
       .eq('id', thoughtId)
-    if (action.action !== 'restore') query = query.is('deleted_at', null)
+    if (action.action === 'move') {
+      query = query.is('deleted_at', null)
+      query = current.collectionId === null
+        ? query.is('collection_id', null)
+        : query.eq('collection_id', current.collectionId)
+    } else if (action.action === 'archive') {
+      query = query.is('deleted_at', null).is('archived_at', null)
+    } else if (action.action === 'unarchive') {
+      query = query.is('deleted_at', null).eq('archived_at', current.archivedAt!)
+    } else if (action.action === 'delete') {
+      query = query.is('deleted_at', null)
+    } else {
+      query = query.eq('deleted_at', current.deletedAt!)
+    }
     const { data, error } = await query.select('*').maybeSingle<ThoughtRecord>()
+    if (error?.code === '23503') {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought state changed')
+    }
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update thought')
-    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
+    if (!data) {
+      const latest = await this.getOwnedAnyState(userId, thoughtId)
+      if (thoughtActionSatisfied(latest, action)) return latest
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought state changed')
+    }
     return toThought(data)
   }
+}
+
+function thoughtActionSatisfied(thought: Thought, action: ThoughtAction) {
+  if (action.action === 'move') return thought.collectionId === action.collectionId
+  if (action.action === 'archive') return thought.archivedAt !== null
+  if (action.action === 'unarchive') return thought.archivedAt === null
+  if (action.action === 'delete') return thought.deletedAt !== null
+  return thought.deletedAt === null
 }
 
 export function encodeThoughtCursor(thought: Pick<ThoughtRecord, 'last_activity_at' | 'id'>) {

@@ -1,7 +1,7 @@
 # WORKFLOW-STATE
 
-- current_stage: implementation
-- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充"
+- current_stage: release_readiness
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充；2026-08-22关于公开自注册替代人工建号和发密码的确认"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
   - PRD.md
@@ -19,6 +19,7 @@
   - tasks-v23/TASK-M-009-统一操作层.md
   - tasks-v23/TASK-M-010-想法管理与合集.md
   - tasks-v23/TASK-M-011-思考停靠与发布.md
+  - tasks-v23/TASK-M-012-公开注册入口.md
   - COMPETITIVE-BRIEF.md
   - CODE-REVIEW.md
   - 上线checkList.md
@@ -41,7 +42,7 @@
   - "旧版TECH-DESIGN.md曾由用户确认并完成实现；该方案以单条碎片为核心，已被PRD V2.0取代，不再作为后续实现依据"
   - "任务拆解已生成并通过专用校验：六个纵向模块、六张必须做任务卡，数据库变更只引用 TECH-DESIGN.md"
   - "任务拆解已由用户审查确认；M-001 补全旧 Vite 入口、组件、数据与 Groq 文件清理清单，并明确保留 useAudioRecorder 供 M-003 重构"
-  - "新 Supabase 项目 retniw 已创建于 ap-southeast-2；三表 DDL 已执行、RLS 已启用、公开注册已关闭"
+  - "历史状态：新 Supabase 项目 retniw 创建时公开注册关闭；该决定已被2026-08-22公开自注册方案取代"
   - "retniw 所有者账号已使用个人 ChatGPT 登录邮箱创建；登录凭据只保存在本机钥匙串"
   - "M-001 已完成：普通会话、无客户端策略 RLS、跨账号资源隔离、账号删除级联和 PWA 生产入口验证通过"
   - "M-002 已完成：文字原文先保存、服务端并发幂等、最近列表与详情、IndexedDB 草稿和失败重试均已通过真实接口与浏览器验收"
@@ -81,7 +82,7 @@
   - "第二版视觉收口：原创回流线标记与斜体字标组成retniw品牌；液态玻璃只用于顶栏、输入、操作组和浮层，正文保持平面与高可读性"
   - "品牌IP试制：从用户参考图提炼宽软耳、低垂眼、点状鼻和安静困惑的神态，重画为原创单色手绘狗头像；不直接描摹参考表情包"
   - "品牌IP定名咖喱狗：固定贴头横向软耳、扁宽脸、低垂椭圆眼、忧虑眉、点鼻和偏侧短嘴；动作与载体可变，识别骨架不变"
-  - "同事内测选择最轻闭环：使用稳定Vercel网址、关闭公开注册、每人独立Supabase账号与退出入口；首轮不增加邀请后台或邮件系统"
+  - "历史状态：同事内测首轮曾使用关闭公开注册和人工独立建号；该入口已被2026-08-22公开自注册方案取代"
   - "内测账号闭环已在真实Supabase验证：账号A写入后账号B按同一ID读取返回404；退出后首页重新转到登录页；临时测试账号与数据已删除"
   - "第二版已部署到 https://retniw.vercel.app：五个生产环境变量已注入，远程构建完成，登录、Enter保存、主动DeepSeek追问、退出和品牌资源均通过生产环境验证"
   - "Vercel项目已连接lazytsuki/retniw，并将GitHub默认分支配置为Production Branch；后续推送会自动更新正式域名，本机无需持续运行"
@@ -114,6 +115,13 @@
   - "V2.3阶段实现已落地：生产兼容迁移生效，17条旧想法摘要完成幂等回填；统一浮层、单层合集、移入归档删除、软删除恢复和checkpoint接口与界面已进入代码"
   - "阶段浏览器回放已覆盖1440和375像素：无横向溢出，账号与更多互斥关闭、移入合集、有备注先到这里返回首页并重开边界通过；归档删除恢复、320/1024、WebKit、代码审查、发布清单和正式域名仍待继续"
   - "2026-08-21用户要求因即将断网阶段暂停；本轮只做本地阶段提交和GitHub同步，不部署未完成版本，重连后沿当前目标继续"
+  - "2026-08-22用户恢复本轮目标，并确认账号入口改为公开邮箱密码注册：无邀请码、无需人工建号；生产Allow new users开启、Confirm email关闭，注册后直接进入"
+  - "公开自注册只开放账号创建，不改变用户内容私有和跨账号隔离；本轮不增加邀请后台、自有SMTP或邮件链接登录"
+  - "公开自注册代码与自动测试已进入工作区；生产Allow new users已开启、Confirm email已关闭并完成Dashboard读回"
+  - "V2.3发布前门禁通过：19个测试文件、117项测试、类型检查、Lint、生产构建、依赖高危审计和diff检查全部通过"
+  - "生产生命周期一致性迁移已应用：本地与远端迁移清单一致，复合owner外键、三个触发器和两个函数读回一致"
+  - "本地Chromium已覆盖320、375、768、1024、1440像素且无水平溢出；菜单关闭、互斥、焦点、右键、触摸滑动、长按、加载竞态和乐观动作通过"
+  - "WebKit本轮只完成375和1440像素登录页基线与提交反馈；合集动态完整链路、checkpoint动态链路、登录后WebKit主链、正式域名双账号隔离和临时数据清理仍待完成"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -127,9 +135,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "用户重连后从阶段提交继续：完成最新构建与320/1024/WebKit回放，补归档删除恢复和手势终验，再做代码审查、发布清单、部署及retniw.cn验证"
+- suggested_next_action: "记录发布提交并推送生产分支，等待Vercel READY；随后在retniw.cn完成合集、checkpoint、登录后WebKit、注册重登、双账号隔离、导出与清理回放，再同步最终证据"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
 - last_confirmed_stage: tech_design
 - confirmation_gate: ""
-- release_checklist: pending
+- release_checklist: pre_release_passed_live_validation_pending

@@ -72,6 +72,15 @@ beforeEach(() => {
 })
 
 describe('thought AI stream route', () => {
+  it('rejects an invalid path id before reading thought data', async () => {
+    const response = await POST(request(), { params: Promise.resolve({ id: 'not-a-uuid' }) })
+
+    expect(response.status).toBe(400)
+    expect(mocks.getOwned).not.toHaveBeenCalled()
+    expect(mocks.listEntries).not.toHaveBeenCalled()
+    expect(mocks.streamText).not.toHaveBeenCalled()
+  })
+
   it('starts independent checks together before opening the model stream', async () => {
     let releaseEntries: ((entries: Array<{ entryType: string; content: string; sourceLabel: null }>) => void) | undefined
     mocks.listEntries.mockReturnValue(new Promise((resolve) => {

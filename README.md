@@ -37,7 +37,7 @@ DEEPSEEK_API_KEY
 DEEPSEEK_MODEL
 ```
 
-业务表使用 [TECH-DESIGN.md](TECH-DESIGN.md) 中的 DDL；Supabase 项目需关闭公开注册，只创建项目所有者账号。
+业务表使用 [TECH-DESIGN.md](TECH-DESIGN.md) 中的 DDL；Supabase Auth 需允许邮箱密码注册。本地配置关闭邮箱确认，注册成功后直接进入。
 
 3. 启动开发服务器：
 
@@ -59,11 +59,13 @@ npm run dev
 
 内测地址：[https://retniw.cn](https://retniw.cn)。旧地址 [https://retniw.vercel.app](https://retniw.vercel.app) 已永久跳转到新域名。线上版本不依赖本机运行，推送当前 GitHub 默认分支后会自动部署。
 
-每位体验者使用独立账号，不共享内容和登录凭据。公开注册保持关闭；新增体验者时，在 Supabase `Authentication > Users` 中创建已确认账号和独立初始密码，再通过一对一渠道发送网址、邮箱和密码。体验者直接记录内容，只有主动选择“帮我接着想”、整理或找联系时才会调用 DeepSeek。
+每位体验者使用独立账号，不共享内容和登录凭据。打开正式地址后，可在登录页选择“创建账号”，使用邮箱和自己设置的密码直接进入，无需邀请码或项目所有者代建账号。公开的是注册入口，不是内容；想法、合集、关系和导出仍仅本人可访问。
+
+生产 Supabase 需要保持`Allow new users`开启、`Confirm email`关闭。当前注册不依赖确认邮件；如果以后需要邮箱验证或密码找回，先配置可靠的生产SMTP，再开启对应链路。
 
 内测内容不得包含工作机密或其他不应交给 Supabase、Vercel、DeepSeek 处理的信息。
 
-人数扩大或需要频繁邀请时，再配置自有 SMTP 并改为邮件链接登录；首轮内测不为此增加邀请后台。
+当前不增加邀请后台、邀请码或邮件链接登录。只有主动选择“帮我接着想”、整理或找联系时，当前必要内容才会交给 DeepSeek 处理。
 
 ## 验证
 

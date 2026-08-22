@@ -8,6 +8,7 @@ import { createServiceClient } from '@/src/lib/supabase/service'
 import { DeepSeekTextProvider, type AiAction } from '@/src/server/ai/deepseek-text-provider'
 import { EntryRepository } from '@/src/server/repositories/entry-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
+import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 
 export const runtime = 'nodejs'
 
@@ -22,7 +23,8 @@ function encodeEvent(encoder: TextEncoder, event: string, data: unknown) {
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const user = await requireUser()
-    const { id: thoughtId } = await params
+    const { id: rawThoughtId } = await params
+    const thoughtId = requireUuid(rawThoughtId, 'id')
     const body = (await request.json().catch(() => null)) as {
       clientRequestId?: unknown
       action?: unknown

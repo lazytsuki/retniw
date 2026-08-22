@@ -1,6 +1,6 @@
 ---
 delivery_scope: fullstack
-source_inputs: REQUIREMENT-ANALYSIS.md, PRD.md, WORKFLOW-STATE.md, package.json, supabase/config.toml, 当前代码, 用户确认 2026-08-21
+source_inputs: REQUIREMENT-ANALYSIS.md, PRD.md, WORKFLOW-STATE.md, package.json, supabase/config.toml, 当前代码, 用户确认 2026-08-21 至 2026-08-22
 codebase_path: /Users/liyingliang.7/retniw
 codebase_mode: brownfield
 implementation_target: retniw-web, retniw-api
@@ -22,6 +22,7 @@ sql_dialect: postgresql
 | `thoughts` | 增量 | 独立保存合集、归档、删除和列表摘要 |
 | `thought_collections`、`thought_checkpoints` | 新增 | 单层合集和思考停靠点分别持久化 |
 | `requireUser`、`listRecent` | 重构 | 减少 Auth 网络请求和长正文重复读取 |
+| `app/login`、Supabase Auth | 增量 | 邮箱密码公开自注册，无邀请码；注册成功直接进入 |
 
 - 停靠、合集归属、归档和删除是四条独立状态轴，不能复用一个枚举或按钮。[PRD][用户确认]
 - “先到这里”创建过程边界并返回全部想法，不自动归档、不调用 AI、不改变合集。[用户确认]
@@ -32,6 +33,7 @@ sql_dialect: postgresql
 - 身份校验使用 Supabase 官方推荐的 `getClaims()`；这里只需要可信用户 ID，不需要最新用户资料。[平台规则]
 - Next.js 16 已弃用 `preferredRegion`，不在路由文件中增加过时配置；部署区域另用线上测量和平台设置验证。[平台规则]
 - 数据库方言为 `postgresql`，证据来自 Supabase 项目配置、现有 UUID/RLS DDL 与 `@supabase/supabase-js` 依赖。[代码: package.json][代码: supabase/config.toml]
+- 账号入口使用 Supabase 邮箱密码`signUp`；生产打开`Allow new users`并关闭`Confirm email`。这是部署配置门禁，不把本地`config.toml`当作生产已生效证据。[用户确认][平台配置]
 
 ### 修改后流程
 
@@ -53,6 +55,16 @@ flowchart TD
 ## 改动设计
 
 ### 前端
+
+#### 公开自注册
+
+- 需求/验收：新体验者只拿到正式网址即可创建独立账号并直接开始，不依赖邀请码、人工建号或确认邮件。
+- 实现目标：`retniw-web`与 Supabase Auth；登录页使用同一页面的“登录/创建账号”模式切换，注册表单收集邮箱、密码和再次确认密码。
+- 增量修改：`signup` Server Action先完成邮箱格式、密码最短6位和两次密码一致校验，再调用`supabase.auth.signUp({ email, password })`；返回session时进入首页，没有session时进入兼容的查收邮件状态。
+- 受影响符号：`app/login/page.tsx`、`app/login/actions.ts`、`src/lib/auth/credentials.ts`、`app/auth/confirm/route.ts`、`createServerAuthClient`
+- 生产配置：Supabase`Allow new users = ON`、`Confirm email = OFF`。本地`supabase/config.toml`保持`enable_signup = true`、`enable_confirmations = false`，但上线必须从生产控制台或管理接口读回验证。
+- 边界与不变约束：不增加邀请码、服务角色建号接口或自有SMTP；注册错误使用通用文案，用户内容仍由既有会话、所有权过滤和RLS隔离。
+- 验证入口：无效输入不调用Supabase；正常注册拿到session并进入首页；生产创建临时账号后完成写入、退出、重登与跨账号404，再清理测试账号及数据。
 
 #### 统一浮层
 
@@ -151,7 +163,7 @@ create table public.thought_checkpoints (
 );
 
 alter table public.thoughts
-  add column collection_id uuid references public.thought_collections (id) on delete set null,
+  add column collection_id uuid,
   add column archived_at timestamptz,
   add column deleted_at timestamptz,
   add column summary_content text,
@@ -165,7 +177,11 @@ alter table public.thoughts
   ),
   add constraint thoughts_summary_source_length check (
     summary_source_label is null or char_length(summary_source_label) between 1 and 255
-  );
+  ),
+  add constraint thoughts_collection_owner_fk
+    foreign key (user_id, collection_id)
+    references public.thought_collections (user_id, id)
+    on delete set null (collection_id);
 
 create index thought_collections_user_created_idx
   on public.thought_collections (user_id, created_at asc, id asc);
@@ -183,6 +199,12 @@ alter table public.thought_collections enable row level security;
 alter table public.thought_checkpoints enable row level security;
 ```
 
+生产兼容迁移分两步执行：`20260821174500_zero_manual_experience.sql`创建上述表、列、索引和RLS；`20260822120000_lifecycle_consistency_guards.sql`补齐最终一致性约束。第二步必须在应用发布前执行并验证：
+
+- thought与collection使用`(user_id, collection_id)`复合外键，阻止跨账号归属；删除合集只清空`collection_id`。
+- entry、checkpoint和connection写入前锁定对应thought；thought已软删除或不存在时拒绝写入，避免删除与长耗时AI/关系请求并发后产生新内容。
+- connection按稳定ID顺序锁定两端thought，避免并发锁顺序不一致。
+
 ## 契约
 
 ### 数据契约
@@ -195,6 +217,19 @@ type ThoughtAction =
 type ThoughtScope = 'active' | 'archived' | 'deleted'
 ```
 
+### 认证契约
+
+```ts
+type SignupCredentials = {
+  email: string
+  password: string
+}
+```
+
+- 注册只接受合法邮箱与至少6位密码；再次确认密码只用于服务端表单校验，不发送给Supabase。
+- Supabase返回用户和session时重定向到`/`；生产配置下应走此分支。返回用户但没有session时展示查收邮件提示，兼容以后重新打开邮箱确认。
+- 登录和注册失败不返回供应商原始错误，也不区分邮箱是否已存在。
+
 - `GET /api/thoughts`新增`scope`和可选`collectionId`；默认`active`。响应中的thought新增`collectionId/archivedAt/deletedAt`，保留现有字段。[设计决策]
 - `PATCH /api/thoughts/:id`执行`ThoughtAction`。非法输入400，不存在或非本人资源404，状态冲突409。[设计决策]
 - `POST /api/thoughts/:id/checkpoints`接收`entryId/clientRequestId/note`；note为0至500字。响应为checkpoint，不创建AI或entry。[设计决策]
@@ -204,12 +239,13 @@ type ThoughtScope = 'active' | 'archived' | 'deleted'
 
 ## 风险与交付
 
-- 发布顺序：先执行新增表、可空列和索引；再幂等回填旧thought摘要；最后发布应用。任一步失败停止后续步骤。
+- 发布顺序：先执行新增表、可空列、约束和索引，再幂等回填旧thought摘要；随后发布应用并确认正式域名指向新构建；最后将生产Supabase设置读回为`Allow new users = ON`、`Confirm email = OFF`并完成临时账号注册回放。任一步失败停止后续步骤。
 - 旧代码忽略新增可空列，新结构保留时可直接回退应用；表和列清理由后续不可逆变更单独处理。
 - 合集删除依赖外键解除归属；生产DDL执行后先用临时账号验证，再保留正式数据。
 - 手势仅在水平位移显著大于垂直位移时生效；长按在移动超过8像素或开始滚动时取消。
 - 快捷删除只软删除。永久删除、废纸篓清理周期和多层分类不在本轮范围。
 - `getClaims()`的收益取决于JWT签名方式；上线前后分别测量，不把官方能力直接写成现网结论。
+- 关闭邮箱确认消除了内测邮件投递依赖，但当前不验证邮箱归属；若以后需要可靠找回密码或扩大开放范围，先配置生产级SMTP，再单独启用邮箱确认和找回入口。
 
 ## 验证映射
 
@@ -222,9 +258,11 @@ type ThoughtScope = 'active' | 'archived' | 'deleted'
 | 移入、归档、删除和停靠互不串联；删除可恢复；合集删除不删除想法。 | `retniw-web`合集入口；`retniw-api`合集与状态接口 | 新建、移入、归档、删除、恢复、删除合集；检查四条状态轴 | 本地自动测试、真实Supabase |
 | 历史列表读取量不随长想法正文增长；详情身份校验不做不需要的远程用户资料查询。 | `retniw-api`摘要列与claims校验 | 大量entries下断言单次摘要查询；合法、过期、缺sub与线上TTFB对比 | Repository测试、正式域名 |
 | 数据不越权且可回退 | `retniw-api`RLS与所有权过滤 | 匿名、第二账号、删除账号、回退旧应用读取 | 真实Supabase、生产构建 |
+| 新体验者无需人工建号即可进入，且注册不公开内容 | `retniw-web`注册表单；Supabase Auth配置 | 表单校验、注册session、退出重登、跨账号404；读回生产开关 | 自动测试、真实Supabase、正式域名 |
 
 ## 设计假设
 
 - 本轮“删除”指可恢复软删除；永久删除另行确认。
 - 合集按创建时间展示，合集内想法按最近活动排序；不增加手动排序。
 - Vercel部署区域若只能从控制台或付费能力调整，先交付测量证据，不在代码中模拟。
+- 公开注册面向当前小范围内测；若出现滥用，再基于真实情况增加验证码或限流，不提前建设邀请系统。

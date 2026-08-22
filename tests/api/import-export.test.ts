@@ -134,6 +134,8 @@ describe('streaming export', () => {
     expect(markdown).toContain('外部原文\n第二行')
     expect(markdown).toContain('先到这里')
     expect(markdown).toContain('下次从这里接着想。')
+    expect(markdown.indexOf('正文 149')).toBeLessThan(markdown.indexOf('先到这里'))
+    expect(markdown.indexOf('先到这里')).toBeLessThan(markdown.indexOf('正文 150'))
     expect(source.listThoughtEntryPage).toHaveBeenNthCalledWith(2, userId, thoughtId, 500, 500)
   })
 })

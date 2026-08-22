@@ -5,6 +5,7 @@ import { createServiceClient } from '@/src/lib/supabase/service'
 import { DeepSeekTextProvider } from '@/src/server/ai/deepseek-text-provider'
 import { ThoughtConnectionRepository } from '@/src/server/repositories/thought-connection-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
+import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -20,7 +21,8 @@ function userEntries(entries: Array<{ id: string; content: string; entryType: st
 export async function POST(_request: Request, { params }: RouteContext) {
   try {
     const user = await requireUser()
-    const { id: thoughtId } = await params
+    const { id: rawThoughtId } = await params
+    const thoughtId = requireUuid(rawThoughtId, 'id')
     const client = createServiceClient()
     const thoughts = new ThoughtRepository(client)
     const connections = new ThoughtConnectionRepository(client)

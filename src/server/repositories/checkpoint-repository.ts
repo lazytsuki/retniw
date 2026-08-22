@@ -28,6 +28,10 @@ function toCheckpoint(row: ThoughtCheckpointRecord): ThoughtCheckpoint {
   }
 }
 
+function isUnwritableThoughtError(error: { code?: string; message?: string } | null) {
+  return error?.code === 'P0001' && error.message?.startsWith('RETNIW_THOUGHT_')
+}
+
 export class CheckpointRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -64,6 +68,9 @@ export class CheckpointRepository {
       .select('*')
       .single<ThoughtCheckpointRecord>()
     if (!error && data) return { checkpoint: toCheckpoint(data), created: true }
+    if (isUnwritableThoughtError(error)) {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    }
     if (error?.code !== '23505') {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to save checkpoint')
     }

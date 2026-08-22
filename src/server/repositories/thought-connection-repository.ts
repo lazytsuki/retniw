@@ -19,8 +19,32 @@ type ThoughtConnectionRecord = {
   created_at: string
 }
 
+function isUnwritableThoughtError(error: { code?: string; message?: string } | null) {
+  return error?.code === 'P0001' && error.message?.startsWith('RETNIW_THOUGHT_')
+}
+
 export class ThoughtConnectionRepository {
   constructor(private readonly client: SupabaseClient) {}
+
+  private async withActiveThoughts(userId: string, records: ThoughtConnectionRecord[]) {
+    if (!records.length) return []
+    const thoughtIds = Array.from(new Set(records.flatMap((record) => [
+      record.source_thought_id,
+      record.target_thought_id,
+    ])))
+    const { data, error } = await this.client
+      .from('thoughts')
+      .select('id')
+      .eq('user_id', userId)
+      .in('id', thoughtIds)
+      .is('deleted_at', null)
+      .returns<Array<{ id: string }>>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connected thoughts')
+    const activeIds = new Set(data.map((thought) => thought.id))
+    return records.filter(
+      (record) => activeIds.has(record.source_thought_id) && activeIds.has(record.target_thought_id),
+    )
+  }
 
   private async toView(userId: string, record: ThoughtConnectionRecord) {
     const { data, error } = await this.client
@@ -65,10 +89,10 @@ export class ThoughtConnectionRepository {
       .eq('status', 'pending')
       .or(`source_thought_id.eq.${thoughtId},target_thought_id.eq.${thoughtId}`)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle<ThoughtConnectionRecord>()
+      .returns<ThoughtConnectionRecord[]>()
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read pending connection')
-    return data ? this.toView(userId, data) : null
+    const [pending] = await this.withActiveThoughts(userId, data)
+    return pending ? this.toView(userId, pending) : null
   }
 
   async createCandidate(input: {
@@ -91,8 +115,10 @@ export class ThoughtConnectionRepository {
     }
     const existing = await this.readPair(input.userId, input.currentThoughtId, input.targetThoughtId)
     if (existing) {
+      const [active] = await this.withActiveThoughts(input.userId, [existing])
+      if (!active) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
       return {
-        connection: existing.status === 'pending' ? await this.toView(input.userId, existing) : null,
+        connection: active.status === 'pending' ? await this.toView(input.userId, active) : null,
         created: false,
       }
     }
@@ -105,25 +131,34 @@ export class ThoughtConnectionRepository {
     if (!inserted.error && inserted.data) {
       return { connection: await this.toView(input.userId, inserted.data), created: true }
     }
+    if (isUnwritableThoughtError(inserted.error)) {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    }
     if (inserted.error?.code !== '23505') {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to save thought connection')
     }
 
     const raced = await this.readPair(input.userId, input.currentThoughtId, input.targetThoughtId)
     if (!raced) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought connection')
+    const [active] = await this.withActiveThoughts(input.userId, [raced])
+    if (!active) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
     return {
-      connection: raced.status === 'pending' ? await this.toView(input.userId, raced) : null,
+      connection: active.status === 'pending' ? await this.toView(input.userId, active) : null,
       created: false,
     }
   }
 
   async markChecked(userId: string, thoughtId: string) {
-    const { error } = await this.client
+    const { data, error } = await this.client
       .from('thoughts')
       .update({ relation_checked_at: new Date().toISOString() })
       .eq('user_id', userId)
       .eq('id', thoughtId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle<{ id: string }>()
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to complete relation check')
+    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
   }
 
   async decide(userId: string, connectionId: string, decision: ThoughtConnectionDecision) {
@@ -135,8 +170,10 @@ export class ThoughtConnectionRepository {
       .maybeSingle<ThoughtConnectionRecord>()
     if (existing.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connection')
     if (!existing.data) throw new ApiError(404, 'NOT_FOUND', 'Resource not found')
-    if (existing.data.status === decision) return this.toView(userId, existing.data)
-    if (existing.data.status !== 'pending') {
+    const [active] = await this.withActiveThoughts(userId, [existing.data])
+    if (!active) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    if (active.status === decision) return this.toView(userId, active)
+    if (active.status !== 'pending') {
       throw new ApiError(409, 'STATE_CONFLICT', 'Connection was already decided')
     }
 
@@ -148,6 +185,9 @@ export class ThoughtConnectionRepository {
       .eq('status', 'pending')
       .select('*')
       .maybeSingle<ThoughtConnectionRecord>()
+    if (isUnwritableThoughtError(updated.error)) {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    }
     if (updated.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update connection')
     if (updated.data) return this.toView(userId, updated.data)
 
@@ -160,7 +200,9 @@ export class ThoughtConnectionRepository {
     if (raced.error || !raced.data) {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connection')
     }
-    if (raced.data.status === decision) return this.toView(userId, raced.data)
+    const [activeRaced] = await this.withActiveThoughts(userId, [raced.data])
+    if (!activeRaced) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    if (activeRaced.status === decision) return this.toView(userId, activeRaced)
     throw new ApiError(409, 'STATE_CONFLICT', 'Connection was already decided')
   }
 }

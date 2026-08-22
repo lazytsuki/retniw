@@ -20,7 +20,7 @@ import { EntryContent } from './entry-content'
 import { isMarkdownContent } from '@/src/lib/markdown'
 import { hasNewUserContext } from '@/src/lib/ai-context'
 import { aiOutputForDisplay } from '@/src/lib/ai-output'
-import { ThoughtNavigation } from './thought-navigation'
+import { requestHistoryAfterCheckpoint, ThoughtNavigation } from './thought-navigation'
 import { ThoughtMenu } from './thought-menu'
 import { CheckpointDialog } from './checkpoint-dialog'
 import type { ThoughtCheckpoint } from '@/src/server/repositories/checkpoint-repository'
@@ -65,11 +65,12 @@ export function ThoughtWorkspace({
     ),
     [initialCheckpoints, localCheckpoints],
   )
-  const lastCheckpointId = checkpoints.at(-1)?.id
+  const lastCheckpoint = checkpoints.at(-1)
   const textareaRef = useThoughtPosition(
     thoughtId,
     content,
-    lastCheckpointId ? `checkpoint-${lastCheckpointId}` : undefined,
+    lastCheckpoint ? `checkpoint-${lastCheckpoint.id}` : undefined,
+    lastCheckpoint?.createdAt,
   )
   const initialPending = initialConnections.find(
     (connection) =>
@@ -286,13 +287,16 @@ export function ThoughtWorkspace({
     setLocalEntries((current) => [...current, payload.data!.entry!])
   }
 
-  async function handleCheckpoint(note: string) {
+  async function handleCheckpoint(
+    note: string,
+    requestIds: { entryId: string; clientRequestId: string },
+  ) {
     const response = await fetch(`/api/thoughts/${thoughtId}/checkpoints`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        entryId: crypto.randomUUID(),
-        clientRequestId: crypto.randomUUID(),
+        entryId: requestIds.entryId,
+        clientRequestId: requestIds.clientRequestId,
         note,
       }),
     })
@@ -301,6 +305,7 @@ export function ThoughtWorkspace({
       | null
     if (!response.ok || !payload?.data?.checkpoint) throw new Error('CHECKPOINT_FAILED')
     setLocalCheckpoints((current) => [...current, payload.data!.checkpoint!])
+    requestHistoryAfterCheckpoint()
     router.push('/')
   }
 

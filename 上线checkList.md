@@ -1,5 +1,7 @@
 # retniw 第二版上线检查清单
 
+> 历史记录：本文件只对应第二版首次发布，当时“公开注册关闭”是旧配置。当前发布必须使用`上线checkList-M007.md`，并验证生产`Allow new users = ON`、`Confirm email = OFF`。
+
 | 检查项 | checkList | 检查结果（默认未选中，可勾选） | 检查人 |
 |---|---|---|---|
 | 上线顺序 | 1. 先在 Supabase 执行幂等迁移<br>2. 在 Vercel 配置环境变量<br>3. 部署单一 Next.js 应用<br>4. 重跑登录、记录、AI、关系、导入导出和离线主链路<br>5. 无 JSF、MQ 或其他应用依赖 | - [x] Supabase 迁移已执行两次并确认幂等<br>- [x] Vercel 生产环境变量已配置<br>- [x] Next.js 应用已部署<br>- [x] 生产主链路已回归<br>- [x] 无严重遗留问题 | Codex |

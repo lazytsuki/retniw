@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Thought } from '@/src/server/repositories/thought-repository'
 import type { ThoughtCollection } from '@/src/server/repositories/collection-repository'
 import { CollectionPicker } from './collection-picker'
@@ -16,6 +17,7 @@ type ThoughtActionMenuProps = {
   onAction: (action: ThoughtAction) => Promise<void>
   onMove: (collectionId: string | null) => Promise<void>
   onCreateCollection: (name: string) => Promise<ThoughtCollection>
+  onOpen?: () => void
 }
 
 function MoveIcon() {
@@ -42,59 +44,182 @@ export function ThoughtActionMenu({
   onAction,
   onMove,
   onCreateCollection,
+  onOpen,
 }: ThoughtActionMenuProps) {
   const menuId = `thought-actions:${menuScope}:${thought.id}`
   const pickerId = `thought-move:${menuScope}:${thought.id}`
-  const menuRef = useRef<HTMLDivElement>(null)
-  const pickerRef = useRef<HTMLDivElement>(null)
+  const triggerId = `thought-action-trigger:${menuScope}:${thought.id}`
+  const actionTriggerRef = useRef<HTMLButtonElement>(null)
+  const layerRef = useRef<HTMLDivElement>(null)
+  const movePendingRef = useRef(false)
+  const [moveState, setMoveState] = useState<'idle' | 'pending' | 'error'>('idle')
   const overlay = useOverlayController()
   const menuOpen = overlay.isOpen(menuId)
   const pickerOpen = overlay.isOpen(pickerId)
-  useDismissibleLayer(menuId, menuRef)
-  useDismissibleLayer(pickerId, pickerRef)
+  useDismissibleLayer(menuId, layerRef, actionTriggerRef)
+  useDismissibleLayer(pickerId, layerRef, actionTriggerRef)
+
+  useLayoutEffect(() => {
+    if (!menuOpen) return
+    const frame = window.requestAnimationFrame(() => {
+      layerRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+        ?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [menuOpen])
+
+  useLayoutEffect(() => {
+    if (!menuOpen && !pickerOpen) return
+    const place = () => {
+      const layer = layerRef.current
+      const trigger = actionTriggerRef.current
+      if (!layer || !trigger) return
+      if (window.matchMedia('(max-width: 900px)').matches) {
+        layer.style.removeProperty('left')
+        layer.style.removeProperty('top')
+        layer.dataset.mobile = 'true'
+        layer.dataset.positioned = 'true'
+        return
+      }
+
+      delete layer.dataset.mobile
+      const triggerRect = trigger.getBoundingClientRect()
+      const width = layer.offsetWidth
+      const height = layer.offsetHeight
+      const edge = 8
+      const gap = 6
+      const left = Math.min(
+        Math.max(edge, triggerRect.right - width),
+        Math.max(edge, window.innerWidth - width - edge),
+      )
+      const below = triggerRect.bottom + gap
+      const above = triggerRect.top - height - gap
+      const preferredTop = below + height <= window.innerHeight - edge
+        ? below
+        : above
+      const top = Math.min(
+        Math.max(edge, preferredTop),
+        Math.max(edge, window.innerHeight - height - edge),
+      )
+      layer.style.left = `${left}px`
+      layer.style.top = `${top}px`
+      layer.dataset.positioned = 'true'
+    }
+
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [actionTriggerRef, menuOpen, pickerOpen])
 
   async function run(action: ThoughtAction) {
-    overlay.close()
+    if (action !== 'delete') overlay.close()
     await onAction(action)
   }
 
+  async function chooseCollection(collectionId: string | null) {
+    if (movePendingRef.current) return
+    movePendingRef.current = true
+    setMoveState('pending')
+    try {
+      await onMove(collectionId)
+      setMoveState('idle')
+      overlay.close(pickerId)
+    } catch {
+      setMoveState('error')
+    } finally {
+      movePendingRef.current = false
+    }
+  }
+
+  function navigateMenu(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'),
+    )
+    if (items.length === 0) return
+
+    event.preventDefault()
+    const currentIndex = items.findIndex((item) => item === document.activeElement)
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? items.length - 1
+        : event.key === 'ArrowDown'
+          ? (currentIndex + 1 + items.length) % items.length
+          : (currentIndex - 1 + items.length) % items.length
+    items[nextIndex]?.focus({ preventScroll: true })
+  }
+
+  const portalTarget = typeof document === 'undefined'
+    ? null
+    : menuScope === 'history'
+      ? document.getElementById('thought-history-layer-root') ?? document.body
+      : document.body
+  const actionLayer = menuOpen ? (
+    <div
+      id={`${menuId}:panel`}
+      className="thought-action-menu__panel thought-action-layer__content"
+      data-scope={menuScope}
+      ref={layerRef}
+      role="menu"
+      onKeyDown={navigateMenu}
+    >
+      {mode !== 'deleted' && <button type="button" role="menuitem" onClick={() => {
+        setMoveState('idle')
+        overlay.open(pickerId)
+      }}><MoveIcon />移入</button>}
+      {mode === 'active' && <button type="button" role="menuitem" onClick={() => void run('archive')}><ArchiveIcon />归档</button>}
+      {mode === 'archived' && <button type="button" role="menuitem" onClick={() => void run('unarchive')}><RestoreIcon />取消归档</button>}
+      {mode !== 'deleted' && <div className="thought-action-menu__danger-group" role="group">
+        <button className="thought-action-menu__danger" type="button" role="menuitem" onClick={() => void run('delete')}><TrashIcon />删除</button>
+      </div>}
+      {mode === 'deleted' && <button type="button" role="menuitem" onClick={() => void run('restore')}><RestoreIcon />恢复</button>}
+    </div>
+  ) : pickerOpen ? (
+    <div
+      aria-busy={moveState === 'pending' || undefined}
+      className="collection-picker-layer thought-action-layer__content"
+      data-scope={menuScope}
+      ref={layerRef}
+    >
+      <CollectionPicker
+        collections={collections}
+        currentId={thought.collectionId}
+        onCreate={onCreateCollection}
+        onChoose={chooseCollection}
+      />
+      {moveState === 'pending' && <p className="collection-picker-layer__status" role="status">正在移入</p>}
+      {moveState === 'error' && <p className="collection-picker-layer__status collection-picker-layer__status--error" role="alert">没有移入，可以重试。</p>}
+    </div>
+  ) : null
+
   return (
-    <div className="thought-action-menu" ref={menuRef}>
+    <div className="thought-action-menu">
       <button
+        id={triggerId}
+        ref={actionTriggerRef}
         className="thought-action-menu__trigger"
         type="button"
         aria-label="想法操作"
-        aria-expanded={menuOpen}
-        onClick={(event) => menuOpen
-          ? overlay.close(menuId)
-          : overlay.open(menuId, event.currentTarget)}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen || pickerOpen}
+        aria-controls={menuOpen ? `${menuId}:panel` : undefined}
+        onClick={(event) => {
+          onOpen?.()
+          if (menuOpen || pickerOpen) overlay.close()
+          else overlay.open(menuId, event.currentTarget)
+        }}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="5" cy="12" r="1.25" /><circle cx="12" cy="12" r="1.25" /><circle cx="19" cy="12" r="1.25" />
         </svg>
       </button>
-      {menuOpen && (
-        <div className="thought-action-menu__panel" role="menu">
-          {mode !== 'deleted' && <button type="button" role="menuitem" onClick={() => overlay.open(pickerId)}><MoveIcon />移入</button>}
-          {mode === 'active' && <button type="button" role="menuitem" onClick={() => void run('archive')}><ArchiveIcon />归档</button>}
-          {mode === 'archived' && <button type="button" role="menuitem" onClick={() => void run('unarchive')}><RestoreIcon />取消归档</button>}
-          {mode !== 'deleted' && <button className="thought-action-menu__danger" type="button" role="menuitem" onClick={() => void run('delete')}><TrashIcon />删除</button>}
-          {mode === 'deleted' && <button type="button" role="menuitem" onClick={() => void run('restore')}><RestoreIcon />恢复</button>}
-        </div>
-      )}
-      {pickerOpen && (
-        <div ref={pickerRef}>
-          <CollectionPicker
-            collections={collections}
-            currentId={thought.collectionId}
-            onCreate={onCreateCollection}
-            onChoose={async (collectionId) => {
-              await onMove(collectionId)
-              overlay.close(pickerId)
-            }}
-          />
-        </div>
-      )}
+      {actionLayer && portalTarget && createPortal(actionLayer, portalTarget)}
     </div>
   )
 }

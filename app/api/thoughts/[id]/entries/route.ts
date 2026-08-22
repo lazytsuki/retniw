@@ -4,6 +4,7 @@ import { requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { EntryRepository } from '@/src/server/repositories/entry-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
+import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 import { parseThoughtEntryInput } from '@/src/server/thoughts/parse-thought-input'
 
 export const runtime = 'nodejs'
@@ -13,7 +14,8 @@ type RouteContext = { params: Promise<{ id: string }> }
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const user = await requireUser()
-    const { id: thoughtId } = await params
+    const { id: rawThoughtId } = await params
+    const thoughtId = requireUuid(rawThoughtId, 'id')
     const input = parseThoughtEntryInput(await request.json().catch(() => null))
     const client = createServiceClient()
     const thoughts = new ThoughtRepository(client)

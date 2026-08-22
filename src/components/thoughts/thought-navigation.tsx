@@ -22,12 +22,25 @@ type ThoughtNavigationProps = {
 type View = { kind: 'recent' | 'archived' | 'deleted' } | { kind: 'collection'; id: string; name: string }
 
 const explicitNewThoughtKey = 'retniw:explicit-new-thought'
+const openHistoryAfterCheckpointKey = 'retniw:open-history-after-checkpoint'
+const openHistoryAfterCheckpointEvent = 'retniw:open-history-after-checkpoint'
 
 function markExplicitNewThought() {
   try {
     sessionStorage.setItem(explicitNewThoughtKey, '1')
   } catch {
     // Navigation still works when browser storage is unavailable.
+  }
+}
+
+export function requestHistoryAfterCheckpoint() {
+  try {
+    if (window.matchMedia('(max-width: 900px)').matches) {
+      sessionStorage.setItem(openHistoryAfterCheckpointKey, '1')
+      window.setTimeout(() => window.dispatchEvent(new Event(openHistoryAfterCheckpointEvent)), 0)
+    }
+  } catch {
+    // Returning home still works when browser storage is unavailable.
   }
 }
 
@@ -58,10 +71,9 @@ export function ThoughtNavigation({
 }: ThoughtNavigationProps) {
   const router = useRouter()
   const overlay = useOverlayController()
-  const historyOpen = overlay.isOpen('history')
-    || overlay.activeId?.startsWith('thought-actions:history:') === true
-    || overlay.activeId?.startsWith('thought-move:history:') === true
+  const [historyOpen, setHistoryOpen] = useState(false)
   const deleteOpen = overlay.isOpen('delete-confirm')
+  const collectionDeleteOpen = overlay.isOpen('collection-delete-confirm')
   const [view, setView] = useState<View>({ kind: 'recent' })
   const [additionalThoughts, setAdditionalThoughts] = useState<ThoughtSummary[]>([])
   const [viewThoughts, setViewThoughts] = useState<ThoughtSummary[]>([])
@@ -74,8 +86,15 @@ export function ThoughtNavigation({
   const [navigatingThoughtId, setNavigatingThoughtId] = useState<string | null>(null)
   const [navigatingNew, setNavigatingNew] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ThoughtSummary | null>(null)
+  const [pendingCollectionDelete, setPendingCollectionDelete] = useState<ThoughtCollection | null>(null)
+  const [deletingCollection, setDeletingCollection] = useState(false)
+  const [collectionDeleteError, setCollectionDeleteError] = useState('')
+  const [revealedThoughtId, setRevealedThoughtId] = useState<string | null>(null)
+  const historyTriggerRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const deleteDialogRef = useRef<HTMLDialogElement>(null)
+  const collectionDeleteDialogRef = useRef<HTMLDialogElement>(null)
+  const viewRequestEpochRef = useRef(0)
   const recentThoughts = useMemo(
     () => mergeThoughts(thoughts, additionalThoughts).filter((thought) => !removedIds.has(thought.id)),
     [additionalThoughts, removedIds, thoughts],
@@ -95,11 +114,55 @@ export function ThoughtNavigation({
   }, [historyOpen])
 
   useEffect(() => {
+    const openAfterCheckpoint = () => setHistoryOpen(true)
+    window.addEventListener(openHistoryAfterCheckpointEvent, openAfterCheckpoint)
+    try {
+      if (sessionStorage.getItem(openHistoryAfterCheckpointKey) === '1') {
+        sessionStorage.removeItem(openHistoryAfterCheckpointKey)
+        if (window.matchMedia('(max-width: 900px)').matches) {
+          queueMicrotask(openAfterCheckpoint)
+        }
+      }
+    } catch {
+      // The desktop sidebar remains available without browser storage.
+    }
+    return () => window.removeEventListener(openHistoryAfterCheckpointEvent, openAfterCheckpoint)
+  }, [])
+
+  useEffect(() => {
     const dialog = deleteDialogRef.current
     if (!dialog) return
     if (deleteOpen && !dialog.open) dialog.showModal()
     if (!deleteOpen && dialog.open) dialog.close()
   }, [deleteOpen])
+
+  useEffect(() => {
+    const dialog = collectionDeleteDialogRef.current
+    if (!dialog) return
+    if (collectionDeleteOpen && !dialog.open) dialog.showModal()
+    if (!collectionDeleteOpen && dialog.open) dialog.close()
+  }, [collectionDeleteOpen])
+
+  useEffect(() => {
+    if (!revealedThoughtId) return
+    const closeFromOutside = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return setRevealedThoughtId(null)
+      if (target.closest('.thought-list-item')?.getAttribute('data-thought-id') === revealedThoughtId) return
+      setRevealedThoughtId(null)
+    }
+    const closeFromScroll = () => setRevealedThoughtId(null)
+    document.addEventListener('pointerdown', closeFromOutside)
+    window.addEventListener('scroll', closeFromScroll, true)
+    return () => {
+      document.removeEventListener('pointerdown', closeFromOutside)
+      window.removeEventListener('scroll', closeFromScroll, true)
+    }
+  }, [revealedThoughtId])
+
+  useEffect(() => {
+    if (overlay.activeId) queueMicrotask(() => setRevealedThoughtId(null))
+  }, [overlay.activeId])
 
   useEffect(() => {
     void fetch('/api/collections')
@@ -109,6 +172,18 @@ export function ThoughtNavigation({
       })
       .catch(() => undefined)
   }, [])
+
+  function openHistory(trigger: HTMLButtonElement) {
+    overlay.close()
+    historyTriggerRef.current = trigger
+    setHistoryOpen(true)
+  }
+
+  function closeHistory() {
+    if (overlay.activeId?.includes(':history:')) overlay.close()
+    setHistoryOpen(false)
+    queueMicrotask(() => historyTriggerRef.current?.isConnected && historyTriggerRef.current.focus())
+  }
 
   function openNewThought(event: MouseEvent<HTMLAnchorElement>) {
     if (!currentStarted) {
@@ -131,46 +206,66 @@ export function ThoughtNavigation({
   }
 
   async function loadView(nextView: View) {
+    const requestEpoch = ++viewRequestEpochRef.current
+    setRevealedThoughtId(null)
     setView(nextView)
+    setViewThoughts([])
+    setNextCursor(null)
     setLoading(true)
     setLoadError('')
     try {
       const response = await fetch(queryFor(nextView))
       const payload = await response.json() as { data?: { thoughts?: ThoughtSummary[]; nextCursor?: string | null } }
+      if (requestEpoch !== viewRequestEpochRef.current) return
       if (!response.ok || !payload.data?.thoughts) throw new Error('LOAD_FAILED')
       setViewThoughts(payload.data.thoughts)
       setNextCursor(payload.data.nextCursor ?? null)
       setRemovedIds(new Set())
     } catch {
+      if (requestEpoch !== viewRequestEpochRef.current) return
       setLoadError('没有加载完成，可以重试。')
       setViewThoughts([])
     } finally {
-      setLoading(false)
+      if (requestEpoch === viewRequestEpochRef.current) setLoading(false)
     }
   }
 
   async function loadMore() {
     if (!nextCursor || loading) return
+    const requestEpoch = ++viewRequestEpochRef.current
+    const requestedView = view
     setLoading(true)
     setLoadError('')
     try {
-      const response = await fetch(queryFor(view, nextCursor))
+      const response = await fetch(queryFor(requestedView, nextCursor))
       const payload = await response.json() as { data?: { thoughts?: ThoughtSummary[]; nextCursor?: string | null } }
+      if (requestEpoch !== viewRequestEpochRef.current) return
       if (!response.ok || !payload.data?.thoughts) throw new Error('LOAD_FAILED')
-      if (view.kind === 'recent') {
+      if (requestedView.kind === 'recent') {
         setAdditionalThoughts((current) => mergeThoughts(current, payload.data!.thoughts!))
       } else {
         setViewThoughts((current) => mergeThoughts(current, payload.data!.thoughts!))
       }
       setNextCursor(payload.data.nextCursor ?? null)
     } catch {
+      if (requestEpoch !== viewRequestEpochRef.current) return
       setLoadError('没有加载完成，可以重试。')
     } finally {
-      setLoading(false)
+      if (requestEpoch === viewRequestEpochRef.current) setLoading(false)
     }
   }
 
+  function showRecent() {
+    viewRequestEpochRef.current += 1
+    setView({ kind: 'recent' })
+    setNextCursor(initialNextCursor)
+    setRemovedIds(new Set())
+    setLoadError('')
+    setLoading(false)
+  }
+
   async function performAction(thought: ThoughtSummary, action: ThoughtAction) {
+    setRevealedThoughtId(null)
     setRemovedIds((current) => new Set(current).add(thought.id))
     setLoadError('')
     try {
@@ -181,6 +276,7 @@ export function ThoughtNavigation({
       })
       if (!response.ok) throw new Error('ACTION_FAILED')
       if (action === 'delete' && thought.id === activeThoughtId) router.push('/')
+      else router.refresh()
     } catch {
       setRemovedIds((current) => {
         const next = new Set(current)
@@ -191,22 +287,21 @@ export function ThoughtNavigation({
     }
   }
 
-  async function requestAction(thought: ThoughtSummary, action: ThoughtAction) {
+  async function requestAction(
+    thought: ThoughtSummary,
+    action: ThoughtAction,
+    trigger?: HTMLElement | null,
+  ) {
     if (action === 'delete') {
       setPendingDelete(thought)
-      overlay.open('delete-confirm')
+      overlay.open('delete-confirm', trigger)
       return
     }
     await performAction(thought, action)
   }
 
   async function moveThought(thought: ThoughtSummary, collectionId: string | null) {
-    const response = await fetch(`/api/thoughts/${thought.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'move', collectionId }),
-    })
-    if (!response.ok) throw new Error('MOVE_FAILED')
+    const previousCollectionId = thought.collectionId
     setCollectionOverrides((current) => new Map(current).set(thought.id, collectionId))
     const patchThought = (item: ThoughtSummary): ThoughtSummary => (
       item.id === thought.id ? { ...item, collectionId } : item
@@ -215,6 +310,65 @@ export function ThoughtNavigation({
     setViewThoughts((current) => current.map(patchThought))
     if (view.kind === 'collection' && collectionId !== view.id) {
       setRemovedIds((current) => new Set(current).add(thought.id))
+    }
+    try {
+      const response = await fetch(`/api/thoughts/${thought.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'move', collectionId }),
+      })
+      if (!response.ok) throw new Error('MOVE_FAILED')
+      router.refresh()
+    } catch (error) {
+      setCollectionOverrides((current) => new Map(current).set(thought.id, previousCollectionId))
+      const restoreThought = (item: ThoughtSummary): ThoughtSummary => (
+        item.id === thought.id ? { ...item, collectionId: previousCollectionId } : item
+      )
+      setAdditionalThoughts((current) => current.map(restoreThought))
+      setViewThoughts((current) => current.map(restoreThought))
+      if (view.kind === 'collection' && previousCollectionId === view.id) {
+        setRemovedIds((current) => {
+          const next = new Set(current)
+          next.delete(thought.id)
+          return next
+        })
+      }
+      throw error
+    }
+  }
+
+  function requestCollectionDelete(collection: ThoughtCollection, trigger: HTMLButtonElement) {
+    setPendingCollectionDelete(collection)
+    setCollectionDeleteError('')
+    overlay.open('collection-delete-confirm', trigger)
+  }
+
+  async function deleteCollection() {
+    const collection = pendingCollectionDelete
+    if (!collection || deletingCollection) return
+    setDeletingCollection(true)
+    setCollectionDeleteError('')
+    try {
+      const response = await fetch(`/api/collections/${collection.id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('DELETE_COLLECTION_FAILED')
+      setCollections((current) => current.filter((item) => item.id !== collection.id))
+      setCollectionOverrides((current) => {
+        const next = new Map(current)
+        for (const thought of [...recentThoughts, ...viewThoughts]) {
+          const currentCollection = next.has(thought.id)
+            ? next.get(thought.id)
+            : thought.collectionId
+          if (currentCollection === collection.id) next.set(thought.id, null)
+        }
+        return next
+      })
+      setPendingCollectionDelete(null)
+      overlay.close('collection-delete-confirm')
+      router.refresh()
+    } catch {
+      setCollectionDeleteError('没有删除合集，可以重试。')
+    } finally {
+      setDeletingCollection(false)
     }
   }
 
@@ -231,8 +385,10 @@ export function ThoughtNavigation({
   }
 
   function navigationContent(menuScope: 'sidebar' | 'history') {
-    const list = visibleThoughts.length === 0
-      ? <p className="thought-list-empty">这里还没有想法。</p>
+    const list = loading && visibleThoughts.length === 0
+      ? <p className="thought-list-loading" role="status">正在加载</p>
+      : visibleThoughts.length === 0 && !loadError
+        ? <p className="thought-list-empty">这里还没有想法。</p>
       : <div className="thought-list">
           {visibleThoughts.map((thought) => (
             <ThoughtListItem
@@ -242,23 +398,22 @@ export function ThoughtNavigation({
               menuScope={menuScope}
               mode={view.kind === 'archived' ? 'archived' : view.kind === 'deleted' ? 'deleted' : 'active'}
               navigating={thought.id === navigatingThoughtId}
+              revealed={revealedThoughtId === thought.id}
               thought={thought}
               onAction={requestAction}
-              onChoose={() => menuScope === 'history' && overlay.close()}
+              onChoose={() => menuScope === 'history' && closeHistory()}
+              onConceal={() => setRevealedThoughtId(null)}
               onCreateCollection={createCollection}
               onMove={moveThought}
               onNavigate={setNavigatingThoughtId}
+              onReveal={() => setRevealedThoughtId(thought.id)}
             />
           ))}
         </div>
 
     return <>
       <div className="thought-navigation__heading">
-        {view.kind !== 'recent' && <button type="button" onClick={() => {
-          setView({ kind: 'recent' })
-          setNextCursor(initialNextCursor)
-          setRemovedIds(new Set())
-        }}>全部</button>}
+        {view.kind !== 'recent' && <button type="button" onClick={showRecent}>全部</button>}
         <h2>{viewTitle(view)}</h2>
       </div>
       {list}
@@ -271,24 +426,13 @@ export function ThoughtNavigation({
             <div className="collection-link" key={collection.id}>
               <button type="button" onClick={() => void loadView({ kind: 'collection', id: collection.id, name: collection.name })}>{collection.name}</button>
               <button
+                className="collection-delete-action"
                 type="button"
                 aria-label={`删除合集 ${collection.name}`}
-                onClick={async () => {
-                  const response = await fetch(`/api/collections/${collection.id}`, { method: 'DELETE' })
-                  if (!response.ok) return setLoadError('没有完成，可以重试。')
-                  setCollections((current) => current.filter((item) => item.id !== collection.id))
-                  setCollectionOverrides((current) => {
-                    const next = new Map(current)
-                    for (const thought of [...recentThoughts, ...viewThoughts]) {
-                      const currentCollection = next.has(thought.id)
-                        ? next.get(thought.id)
-                        : thought.collectionId
-                      if (currentCollection === collection.id) next.set(thought.id, null)
-                    }
-                    return next
-                  })
-                }}
-              >×</button>
+                onClick={(event) => requestCollectionDelete(collection, event.currentTarget)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
+              </button>
             </div>
           ))}
         </section>}
@@ -319,7 +463,12 @@ export function ThoughtNavigation({
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v8M8 12h8" /></svg>
           <span>{navigatingNew ? '正在打开' : '写新想法'}</span>
         </Link>
-        <button type="button" onClick={(event) => overlay.open('history', event.currentTarget)}>
+        <button
+          ref={historyTriggerRef}
+          type="button"
+          aria-expanded={historyOpen}
+          onClick={(event) => historyOpen ? closeHistory() : openHistory(event.currentTarget)}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7.5h12M6 12h12M6 16.5h8" /></svg>
           <span>以前的想法</span>
         </button>
@@ -329,32 +478,66 @@ export function ThoughtNavigation({
         className="thought-history-dialog"
         ref={dialogRef}
         onClick={(event) => {
-          if (event.target === event.currentTarget) overlay.close('history')
+          if (event.target === event.currentTarget) closeHistory()
         }}
-        onCancel={(event) => { event.preventDefault(); overlay.close('history') }}
-        onClose={() => historyOpen && overlay.close('history')}
+        onCancel={(event) => { event.preventDefault(); closeHistory() }}
+        onClose={() => historyOpen && closeHistory()}
       >
-        <div className="thought-history-dialog__header"><h2>以前的想法</h2><button type="button" onClick={() => overlay.close('history')}>关闭</button></div>
+        <div className="thought-history-dialog__header"><h2>以前的想法</h2><button type="button" onClick={closeHistory}>关闭</button></div>
         <div className="thought-history-dialog__body">{navigationContent('history')}</div>
+        <div id="thought-history-layer-root" />
       </dialog>
 
       <dialog
         className="confirm-dialog"
         ref={deleteDialogRef}
-        onClick={(event) => { if (event.target === event.currentTarget) overlay.close('delete-confirm') }}
-        onCancel={(event) => { event.preventDefault(); overlay.close('delete-confirm') }}
+        onClick={(event) => { if (event.target === event.currentTarget) { setPendingDelete(null); overlay.close('delete-confirm') } }}
+        onCancel={(event) => { event.preventDefault(); setPendingDelete(null); overlay.close('delete-confirm') }}
         onClose={() => deleteOpen && overlay.close('delete-confirm')}
       >
         <h2>删除这个想法？</h2>
         <p>之后可以在“已删除”中恢复。</p>
         <div>
-          <button type="button" onClick={() => overlay.close('delete-confirm')}>取消</button>
+          <button type="button" onClick={() => { setPendingDelete(null); overlay.close('delete-confirm') }}>取消</button>
           <button className="danger" type="button" onClick={async () => {
             const thought = pendingDelete
             overlay.close('delete-confirm')
             setPendingDelete(null)
             if (thought) await performAction(thought, 'delete')
           }}>删除</button>
+        </div>
+      </dialog>
+
+      <dialog
+        className="confirm-dialog"
+        ref={collectionDeleteDialogRef}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget || deletingCollection) return
+          setPendingCollectionDelete(null)
+          setCollectionDeleteError('')
+          overlay.close('collection-delete-confirm')
+        }}
+        onCancel={(event) => {
+          event.preventDefault()
+          if (deletingCollection) return
+          setPendingCollectionDelete(null)
+          setCollectionDeleteError('')
+          overlay.close('collection-delete-confirm')
+        }}
+        onClose={() => collectionDeleteOpen && !deletingCollection && overlay.close('collection-delete-confirm')}
+      >
+        <h2>删除这个合集？</h2>
+        <p>只删除合集，不会删除里面的想法。</p>
+        {collectionDeleteError && <p className="confirm-dialog__error" role="alert">{collectionDeleteError}</p>}
+        <div>
+          <button type="button" disabled={deletingCollection} onClick={() => {
+            setPendingCollectionDelete(null)
+            setCollectionDeleteError('')
+            overlay.close('collection-delete-confirm')
+          }}>取消</button>
+          <button className="danger" type="button" disabled={deletingCollection} onClick={() => void deleteCollection()}>
+            {deletingCollection ? '正在删除' : '删除合集'}
+          </button>
         </div>
       </dialog>
     </>

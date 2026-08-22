@@ -7,6 +7,7 @@ import {
   ThoughtConnectionRepository,
   type ThoughtConnectionDecision,
 } from '@/src/server/repositories/thought-connection-repository'
+import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 
 export const runtime = 'nodejs'
 type RouteContext = { params: Promise<{ id: string }> }
@@ -14,7 +15,8 @@ type RouteContext = { params: Promise<{ id: string }> }
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
     const user = await requireUser()
-    const { id } = await params
+    const { id: rawId } = await params
+    const id = requireUuid(rawId, 'id')
     const body = (await request.json().catch(() => null)) as { decision?: unknown } | null
     if (body?.decision !== 'confirmed' && body?.decision !== 'rejected') {
       throw new ApiError(400, 'INVALID_INPUT', 'Decision must be confirmed or rejected')

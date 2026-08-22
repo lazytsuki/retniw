@@ -88,6 +88,17 @@ beforeEach(() => {
 })
 
 describe('thought relation check', () => {
+  it('rejects an invalid thought id before checking relations', async () => {
+    const response = await checkRelation(new Request('http://localhost'), {
+      params: Promise.resolve({ id: 'not-a-uuid' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(mocks.getDetail).not.toHaveBeenCalled()
+    expect(mocks.pending).not.toHaveBeenCalled()
+    expect(mocks.findConnection).not.toHaveBeenCalled()
+  })
+
   it('marks a single thought checked without invoking the model', async () => {
     mocks.listRecent.mockResolvedValue({ thoughts: [{ id: currentId }], nextCursor: null })
 
@@ -176,6 +187,21 @@ describe('thought relation check', () => {
 })
 
 describe('thought connection decision', () => {
+  it('rejects an invalid connection id before calling the repository', async () => {
+    const request = new NextRequest('http://localhost/api/thought-connections/not-a-uuid', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'confirmed' }),
+    })
+
+    const response = await decideRelation(request, {
+      params: Promise.resolve({ id: 'not-a-uuid' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(mocks.decide).not.toHaveBeenCalled()
+  })
+
   it('maps a non-owned connection to 404', async () => {
     mocks.decide.mockRejectedValue(new ApiError(404, 'NOT_FOUND', 'Resource not found'))
     const request = new NextRequest(`http://localhost/api/thought-connections/${connection.id}`, {
