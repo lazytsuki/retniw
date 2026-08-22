@@ -159,8 +159,8 @@ export function ThoughtWorkspace({
     if (!firstSyncObserved.current) return
     waitingForFirstSync.current = null
     firstSyncObserved.current = false
-    window.history.replaceState(null, '', `/thoughts/${thoughtId}`)
-  }, [activeOutbox, thoughtId])
+    router.replace(`/thoughts/${thoughtId}`, { scroll: false })
+  }, [activeOutbox, router, thoughtId])
 
   const entries = useMemo(() => {
     const combined = new Map<string, Entry>()
