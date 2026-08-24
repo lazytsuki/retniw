@@ -150,6 +150,8 @@
   - "V2.4生产Chromium与WebKit回放各获得一次DeepSeek真实候选并完成保留；两个样本使用同一组测试语义，只证明真实候选链路可以闭环，不外推模型会稳定产出或候选质量已充分验证"
   - "V2.4生产双账号隔离通过：第二账号对第一账号想法的读、写、删均返回404，第二账号回看仍默认关闭；临时账号及thoughts、entries、preferences、connections等相关数据清理后回查为0"
   - "V2.4正式入口未登录时根页与/review正确跳转/login，/api/review返回401；retniw.vercel.app继续以HTTP 308跳转retniw.cn，最终回放期间未发现HTTP 5xx，目标deployment近30分钟500日志查询为空"
+  - "V2.4发布后响应收口提交e75980e2a2e1143484bd831e2064538acc1ab71a：想法详情与回看增加即时loading边界，历史列表只预取用户明确指向的单条内容；合集与回看首屏数据改为服务端并行下发，成功时不再水合后重复请求，合集首读失败仍保留一次客户端补拉"
+  - "V2.4发布后响应收口本地门禁通过：25个测试文件、147项测试、typecheck、lint、Next.js 16.3.1生产build、npm audit高危门禁和git diff --check全部通过；本地生产构建在1280与375像素公开注册页无横向溢出，console error为0"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
