@@ -1,6 +1,6 @@
 # WORKFLOW-STATE
 
-- current_stage: release_validation_in_progress
+- current_stage: released_v24
 - source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充；2026-08-22关于公开自注册替代人工建号和发密码的确认；2026-08-24关于永久删除、归档区重构、跨想法主动复盘与串联，以及‘先记录 后表达’真实内测反馈的补充"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
@@ -139,12 +139,17 @@
   - "新删除在强提醒确认后永久生效，不提供恢复或已删除区域；旧版已软删除数据本轮继续隐藏，不做未授权批量清理"
   - "归档是以前的想法下的次级子视图，移入负责单层合集归属；不再使用全部、归档、已删除并列筛选"
   - "PRD V2.4与TECH-DESIGN V2.4已完成并通过专用校验；tasks-v24按生命周期、跨想法回看底座、独立回看主区和跨端发布拆为四个模块，任务拆解校验通过"
-  - "2026-08-24只读核对生产schema：指向thoughts的entries、thought_checkpoints和thought_connections两端共4个外键均为ON DELETE CASCADE，物理删除采用单条原子DELETE，不做应用层多步清理；发布后仍需再次读回"
+  - "2026-08-24发布门禁只读核对生产schema：指向thoughts的entries、thought_checkpoints和thought_connections两端共4个外键均为ON DELETE CASCADE；物理删除采用单条原子DELETE，不做应用层多步清理"
   - "V2.4完整本地门禁通过：24个测试文件、143项测试，以及typecheck、lint、Next.js 16.3.1生产build、npm audit高危门禁和git diff --check全部通过；构建产物包含/api/review、/api/review/preference和/review"
   - "V2.4两项生产迁移已应用，entries.review_checked_at以nullable列读回；生产PostgREST精确FK嵌入列表和exact count冒烟通过"
   - "跨想法回看改为entry级原子认领并验证通过：同一entry幂等重试只处理一次，不同entry不受after回调顺序影响且各处理一次，AI entry不可认领"
   - "V2.4本地浏览器闭环通过Chromium 1440与WebKit 375；本地DeepSeek真实请求本轮返回0个候选，候选卡片和处理交互只用临时fixture验证，不记为模型线上产出"
   - "V2.4独立复审结论为GO，可进入生产应用部署与正式域名回放；生产发布SHA、Vercel READY、alias/source和retniw.cn跨端回放尚未形成证据，当前状态仍为发布验证中"
+  - "V2.4已正式发布：功能提交861301a6bc01e84966e7fe4bca85621650172720，移动导航焦点热修1fe9eb9a97df3d495a7df0c86dba2577cf8e4a2d；production deployment dpl_9daty4JH33kdQbc8qqBFb4nEruXB为READY，别名包含retniw.cn与retniw.vercel.app，Vercel source SHA读回与热修提交一致"
+  - "V2.4正式域名主链通过Chromium 1440与WebKit 375回放：公开注册、默认关闭、关闭后重开、保存后异步回看、保留联系、停靠、归档、永久删除的取消与确认、退出重登均可闭环；两端均无横向溢出和console error，关键就地反馈采样为桌面54/32毫秒、移动最新59/45毫秒"
+  - "V2.4生产Chromium与WebKit回放各获得一次DeepSeek真实候选并完成保留；两个样本使用同一组测试语义，只证明真实候选链路可以闭环，不外推模型会稳定产出或候选质量已充分验证"
+  - "V2.4生产双账号隔离通过：第二账号对第一账号想法的读、写、删均返回404，第二账号回看仍默认关闭；临时账号及thoughts、entries、preferences、connections等相关数据清理后回查为0"
+  - "V2.4正式入口未登录时根页与/review正确跳转/login，/api/review返回401；retniw.vercel.app继续以HTTP 308跳转retniw.cn，最终回放期间未发现HTTP 5xx，目标deployment近30分钟500日志查询为空"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -158,9 +163,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "固定V2.4发布提交并部署生产应用，读回Vercel READY、alias与source SHA后，在retniw.cn完成Chromium 1440、WebKit 375和临时账号隔离回放"
+- suggested_next_action: "进入真实用户验证：观察首次用户能否不经说明走通记录、回看和保留联系，并持续记录真实触摸手势、三网访问、模型候选质量与数据规模增长后的精确计数成本"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
-- last_confirmed_stage: code_review
+- last_confirmed_stage: released_v24
 - confirmation_gate: ""
-- release_checklist: in_progress_v24
+- release_checklist: completed_v24
