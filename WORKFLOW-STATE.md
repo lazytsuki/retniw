@@ -152,6 +152,8 @@
   - "V2.4正式入口未登录时根页与/review正确跳转/login，/api/review返回401；retniw.vercel.app继续以HTTP 308跳转retniw.cn，最终回放期间未发现HTTP 5xx，目标deployment近30分钟500日志查询为空"
   - "V2.4发布后响应收口提交e75980e2a2e1143484bd831e2064538acc1ab71a：想法详情与回看增加即时loading边界，历史列表只预取用户明确指向的单条内容；合集与回看首屏数据改为服务端并行下发，成功时不再水合后重复请求，合集首读失败仍保留一次客户端补拉"
   - "V2.4发布后响应收口本地门禁通过：25个测试文件、147项测试、typecheck、lint、Next.js 16.3.1生产build、npm audit高危门禁和git diff --check全部通过；本地生产构建在1280与375像素公开注册页无横向溢出，console error为0"
+  - "V2.4发布后响应收口已上线：文档提交29a9605b8ba401d81bc5bd5bce8ebe7bb7e33db3对应production deployment dpl_27JXLhWya1emYsfC4MuomrPV2pX3，Vercel实时读回状态READY、source SHA一致，别名包含retniw.cn和retniw.vercel.app"
+  - "V2.4发布后正式域名公开入口复验通过：Chromium在1440与375像素可进入登录和公开注册，无横向溢出和console error；本轮登录与注册切换RSC采样545至651毫秒；/api/review未登录返回401，旧地址返回308并最终进入retniw.cn/login。本轮未重新使用账号回放登录后数据主链，不替代此前V2.4生产双账号与完整闭环证据"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
