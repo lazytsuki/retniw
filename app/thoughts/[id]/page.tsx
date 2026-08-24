@@ -47,7 +47,6 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
         initialCheckpoints={data.checkpoints}
         initialThoughts={recent.thoughts}
         initialNextCursor={recent.nextCursor}
-        initialConnections={data.connections}
       />
     </main>
   )

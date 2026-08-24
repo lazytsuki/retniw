@@ -7,8 +7,10 @@ import { decodeThoughtCursor, ThoughtRepository } from '@/src/server/repositorie
 import { parseThoughtInput } from '@/src/server/thoughts/parse-thought-input'
 import { UUID_PATTERN } from '@/src/server/thoughts/parse-thought-management'
 import { ApiError } from '@/src/lib/api-error'
+import { scheduleSavedEntryReview } from '@/src/server/review/schedule-saved-entry-review'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +32,14 @@ export async function POST(request: NextRequest) {
 
     await thoughts.touch(user.id, input.thoughtId, entryResult.entry.createdAt)
     await thoughts.setSummaryIfEmpty(user.id, input.thoughtId, entryResult.entry)
+    if (entryResult.entry.entryType === 'user' || entryResult.entry.entryType === 'import') {
+      scheduleSavedEntryReview({
+        userId: user.id,
+        thoughtId: input.thoughtId,
+        entryId: entryResult.entry.id,
+        processedThrough: entryResult.entry.createdAt,
+      })
+    }
     return NextResponse.json(
       { data: { thought: thoughtResult.thought, entry: entryResult.entry } },
       { status: thoughtResult.created && entryResult.created ? 201 : 200 },
@@ -45,7 +55,7 @@ export async function GET(request: NextRequest) {
     const cursorValue = request.nextUrl.searchParams.get('cursor')
     const scopeValue = request.nextUrl.searchParams.get('scope') ?? 'active'
     const collectionId = request.nextUrl.searchParams.get('collectionId') ?? undefined
-    if (!['active', 'archived', 'deleted'].includes(scopeValue)) {
+    if (scopeValue !== 'active' && scopeValue !== 'archived') {
       throw new ApiError(400, 'INVALID_INPUT', 'scope 无效')
     }
     if (collectionId && !UUID_PATTERN.test(collectionId)) {
@@ -55,7 +65,7 @@ export async function GET(request: NextRequest) {
       user.id,
       cursorValue ? decodeThoughtCursor(cursorValue) : undefined,
       {
-        scope: scopeValue as 'active' | 'archived' | 'deleted',
+        scope: scopeValue,
         collectionId,
       },
     )

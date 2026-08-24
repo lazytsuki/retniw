@@ -22,9 +22,8 @@ export function parseThoughtAction(body: unknown) {
         : requireUuid(input.collectionId, 'collectionId'),
     }
   }
-  if (['archive', 'unarchive', 'delete', 'restore'].includes(String(input.action))) {
-    return { action: input.action as 'archive' | 'unarchive' | 'delete' | 'restore' }
-  }
+  if (input.action === 'archive') return { action: 'archive' as const }
+  if (input.action === 'unarchive') return { action: 'unarchive' as const }
   throw new ApiError(400, 'INVALID_INPUT', '操作无效')
 }
 

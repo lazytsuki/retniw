@@ -1,7 +1,7 @@
 # WORKFLOW-STATE
 
-- current_stage: released
-- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充；2026-08-22关于公开自注册替代人工建号和发密码的确认"
+- current_stage: release_validation_in_progress
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充；2026-08-22关于公开自注册替代人工建号和发密码的确认；2026-08-24关于永久删除、归档区重构、跨想法主动复盘与串联，以及‘先记录 后表达’真实内测反馈的补充"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
   - PRD.md
@@ -20,11 +20,18 @@
   - tasks-v23/TASK-M-010-想法管理与合集.md
   - tasks-v23/TASK-M-011-思考停靠与发布.md
   - tasks-v23/TASK-M-012-公开注册入口.md
+  - tasks-v24/TASK-STATUS.md
+  - tasks-v24/TASK-M-013-生命周期与历史层级.md
+  - tasks-v24/TASK-M-014-跨想法回看底座.md
+  - tasks-v24/TASK-M-015-回看主区与隐私控制.md
+  - tasks-v24/TASK-M-016-跨端终验与发布.md
   - COMPETITIVE-BRIEF.md
   - CODE-REVIEW.md
   - 上线checkList.md
   - CODE-REVIEW-M007.md
   - 上线checkList-M007.md
+  - CODE-REVIEW-V24.md
+  - 上线checkList-V24.md
   - archive/tasks-v1/
 - confirmed_decisions:
   - "首版选择 A：手机优先、Mac 可访问，并需要跨端同步"
@@ -126,6 +133,18 @@
   - "正式域名核心闭环通过：公开注册、退出重登、普通保存不自动调用AI、主动AI、合集、移入、归档、删除、恢复、导出和有/无备注checkpoint均完成；跨账号读写返回404，按临时账号ID与测试前缀回查，Auth账号及thoughts、entries、thought_checkpoints、thought_connections、thought_collections相关记录均为0"
   - "首次保存路由热修通过Chromium 1440与WebKit 375生产回放：16至19毫秒出现就地反馈，约3.2秒进入真实详情路由；checkpoint返回空白首页，Back重开原想法，再点写新想法仍为空白，移动与桌面关键状态无横向溢出"
   - "2026-08-22T06:10:28Z生产详情读取曾出现一次未定位的瞬时500；随后WebKit与Chromium各5次冷导航均为200，最终热修回放无HTTP 5xx。该异常保留为观察项，不记为已修复或线上零错误；旧域名只确认正确边缘IP和SNI下返回308，大陆DNS污染仍存在"
+  - "2026-08-24用户确认跨想法回看采用A方案：默认关闭，首次明确开启并可随时关闭；开启后保存新原文只在响应完成后异步比较必要的新旧用户内容"
+  - "记录、联系、回看作为三层结构：用户原文是事实，AI只提出有两端原文依据的候选，用户保留后才成为长期联系；回看独立于任一单想法"
+  - "单想法内的帮我接着想与整理仍由用户主动调用；跨想法后台比较不自动续写、确认、分类、归档或形成最终观点"
+  - "新删除在强提醒确认后永久生效，不提供恢复或已删除区域；旧版已软删除数据本轮继续隐藏，不做未授权批量清理"
+  - "归档是以前的想法下的次级子视图，移入负责单层合集归属；不再使用全部、归档、已删除并列筛选"
+  - "PRD V2.4与TECH-DESIGN V2.4已完成并通过专用校验；tasks-v24按生命周期、跨想法回看底座、独立回看主区和跨端发布拆为四个模块，任务拆解校验通过"
+  - "2026-08-24只读核对生产schema：指向thoughts的entries、thought_checkpoints和thought_connections两端共4个外键均为ON DELETE CASCADE，物理删除采用单条原子DELETE，不做应用层多步清理；发布后仍需再次读回"
+  - "V2.4完整本地门禁通过：24个测试文件、143项测试，以及typecheck、lint、Next.js 16.3.1生产build、npm audit高危门禁和git diff --check全部通过；构建产物包含/api/review、/api/review/preference和/review"
+  - "V2.4两项生产迁移已应用，entries.review_checked_at以nullable列读回；生产PostgREST精确FK嵌入列表和exact count冒烟通过"
+  - "跨想法回看改为entry级原子认领并验证通过：同一entry幂等重试只处理一次，不同entry不受after回调顺序影响且各处理一次，AI entry不可认领"
+  - "V2.4本地浏览器闭环通过Chromium 1440与WebKit 375；本地DeepSeek真实请求本轮返回0个候选，候选卡片和处理交互只用临时fixture验证，不记为模型线上产出"
+  - "V2.4独立复审结论为GO，可进入生产应用部署与正式域名回放；生产发布SHA、Vercel READY、alias/source和retniw.cn跨端回放尚未形成证据，当前状态仍为发布验证中"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -139,9 +158,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "邀请至少5名未听过介绍的用户只凭retniw.cn体验，并在移动、联通、电信无代理网络分别记录打开、登录、保存和AI操作结果"
+- suggested_next_action: "固定V2.4发布提交并部署生产应用，读回Vercel READY、alias与source SHA后，在retniw.cn完成Chromium 1440、WebKit 375和临时账号隔离回放"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
-- last_confirmed_stage: released
+- last_confirmed_stage: code_review
 - confirmation_gate: ""
-- release_checklist: done
+- release_checklist: in_progress_v24

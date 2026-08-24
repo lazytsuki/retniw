@@ -8,11 +8,9 @@ import { ThoughtComposer } from './thought-composer'
 import { SyncStatus } from './sync-status'
 import { useAiAction } from '@/src/hooks/use-ai-action'
 import { useCaptureOutbox } from '@/src/hooks/use-capture-outbox'
-import { useRelationCheck, type RelationConnection } from '@/src/hooks/use-relation-check'
 import type { ThoughtOutboxItem } from '@/src/lib/capture/capture-store'
 import type { Entry } from '@/src/server/repositories/entry-repository'
 import type { Thought } from '@/src/server/repositories/thought-repository'
-import { RelationCandidate } from './relation-candidate'
 import { EntryActions } from './entry-actions'
 import { ImportTextDialog, type ImportSubmission } from './import-text-dialog'
 import { useThoughtPosition } from '@/src/hooks/use-thought-position'
@@ -34,7 +32,6 @@ type ThoughtWorkspaceProps = {
   initialCheckpoints: ThoughtCheckpoint[]
   initialThoughts: ThoughtSummary[]
   initialNextCursor: string | null
-  initialConnections: RelationConnection[]
 }
 
 function nextIds() {
@@ -49,7 +46,6 @@ export function ThoughtWorkspace({
   initialCheckpoints,
   initialThoughts,
   initialNextCursor,
-  initialConnections,
 }: ThoughtWorkspaceProps) {
   const router = useRouter()
   const overlay = useOverlayController()
@@ -72,17 +68,6 @@ export function ThoughtWorkspace({
     lastCheckpoint ? `checkpoint-${lastCheckpoint.id}` : undefined,
     lastCheckpoint?.createdAt,
   )
-  const initialPending = initialConnections.find(
-    (connection) =>
-      connection.status === 'pending' &&
-      connection.sourceEntry?.entryType !== 'ai' &&
-      connection.targetEntry?.entryType !== 'ai',
-  ) ?? null
-  const {
-    state: relationState,
-    check: checkRelation,
-    decide: decideRelation,
-  } = useRelationCheck(initialPending)
   const handleEntrySynced = useCallback(
     (item: ThoughtOutboxItem) => {
       if (item.thoughtId !== thoughtId) return
@@ -333,8 +318,6 @@ export function ThoughtWorkspace({
         currentStarted={started}
         initialNextCursor={initialNextCursor}
         thoughts={displayThoughts}
-        relationRunning={relationState.status === 'checking'}
-        onFindRelations={() => void checkRelation(thoughtId)}
       />
       <section className="thought-main" id="current-thought" aria-label="当前想法">
         <header className="workspace-heading">
@@ -367,7 +350,11 @@ export function ThoughtWorkspace({
                 ? aiOutputForDisplay(entry.content, entry.aiAction)
                 : entry.content
               return (
-                <article className={entry.entryType === 'ai' ? 'thought-entry thought-entry--assist' : 'thought-entry'} key={entry.id}>
+                <article
+                  className={entry.entryType === 'ai' ? 'thought-entry thought-entry--assist' : 'thought-entry'}
+                  id={`entry-${entry.id}`}
+                  key={entry.id}
+                >
                   {entry.entryType === 'import' && <p className="entry-source">来自 {entry.sourceLabel}</p>}
                   {entry.entryType === 'ai' && (
                     <p className="entry-source entry-source--assist">
@@ -416,14 +403,6 @@ export function ThoughtWorkspace({
             onContinue={() => void ai.run(thoughtId, 'advance')}
           />
         )}
-        <RelationCandidate
-          currentThoughtId={thoughtId}
-          status={relationState.status}
-          connection={relationState.connection}
-          message={relationState.message}
-          onCheck={() => void checkRelation(thoughtId)}
-          onDecide={(decision) => void decideRelation(decision)}
-        />
         <ImportTextDialog
           open={overlay.isOpen('import')}
           currentAllowed={started}

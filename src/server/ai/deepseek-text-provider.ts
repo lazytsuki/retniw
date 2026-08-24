@@ -14,17 +14,15 @@ type ReconnectResult = {
   rationale: string | null
 }
 
-type ConnectionThought = {
+export type ReviewCandidateSummary = {
   id: string
-  entries: Array<{ id: string; content: string }>
+  summary: string
 }
 
-export type ConnectionSuggestion = {
+export type ReviewSuggestion = {
   targetThoughtId: string
-  sourceEntryId: string
-  targetEntryId: string
   rationale: string
-} | null
+}
 
 export class DeepSeekTextProvider {
   constructor(
@@ -32,7 +30,7 @@ export class DeepSeekTextProvider {
     private readonly fetchImplementation: Fetch = fetch,
   ) {}
 
-  private async complete(system: string, input: unknown) {
+  private async complete(system: string, input: unknown, timeoutMs = 60_000) {
     if (!this.apiKey) {
       throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service is not configured', true)
     }
@@ -55,7 +53,7 @@ export class DeepSeekTextProvider {
             { role: 'user', content: JSON.stringify(input) },
           ],
         }),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(timeoutMs),
       })
     } catch {
       throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service is temporarily unavailable', true)
@@ -217,38 +215,68 @@ export class DeepSeekTextProvider {
     } satisfies ReconnectResult
   }
 
-  async findConnection(current: ConnectionThought, candidates: ConnectionThought[]) {
-    const result = (await this.complete(
-      '输入只包含用户自己写下或导入的内容。判断当前想法是否与一个旧想法存在值得用户亲自确认的直接联系。只返回 JSON，格式为 {"targetThoughtId":"候选id或null","sourceEntryId":"当前想法中的依据entry id或null","targetEntryId":"旧想法中的依据entry id或null","rationale":"一句讲人话的简短理由或null"}。理由只说明两段内容共同关注什么，不得出现“当前思考”“候选”“entry”“匹配”等系统词。没有明确联系时四个字段都返回null。不得返回输入之外的想法或entry id。',
-      { current, candidates },
-    )) as Record<string, unknown>
+  async findConnections(
+    source: { content: string },
+    candidates: ReviewCandidateSummary[],
+  ): Promise<ReviewSuggestion[]> {
+    const boundedCandidates = candidates.slice(0, 20).map((candidate) => ({
+      id: candidate.id,
+      summary: candidate.summary.slice(0, 500),
+    }))
+    if (!boundedCandidates.length) return []
+
+    const result = await this.complete(
+      '输入只包含用户自己写下或导入的内容。找出与这次内容存在明确联系的旧想法，最多返回3条。只返回JSON，严格格式为 {"connections":[{"targetThoughtId":"候选id","rationale":"一句不超过300字、讲人话的理由"}]}。没有明确联系时返回空数组。不得返回候选之外的id，不得补写输入中没有的信息。',
+      {
+        source: { content: source.content.slice(0, 2000) },
+        candidates: boundedCandidates,
+      },
+      45_000,
+    )
 
     if (
-      result.targetThoughtId === null &&
-      result.sourceEntryId === null &&
-      result.targetEntryId === null &&
-      result.rationale === null
-    ) return null
-
-    const candidate = candidates.find((item) => item.id === result.targetThoughtId)
-    if (
-      !candidate ||
-      typeof result.sourceEntryId !== 'string' ||
-      !current.entries.some((entry) => entry.id === result.sourceEntryId) ||
-      typeof result.targetEntryId !== 'string' ||
-      !candidate.entries.some((entry) => entry.id === result.targetEntryId) ||
-      typeof result.rationale !== 'string' ||
-      !result.rationale.trim() ||
-      result.rationale.trim().length > 1000
+      typeof result !== 'object' ||
+      result === null ||
+      Array.isArray(result) ||
+      Object.keys(result).length !== 1 ||
+      !Array.isArray((result as { connections?: unknown }).connections)
     ) {
       throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
     }
 
-    return {
-      targetThoughtId: candidate.id,
-      sourceEntryId: result.sourceEntryId,
-      targetEntryId: result.targetEntryId,
-      rationale: result.rationale.trim(),
-    } satisfies Exclude<ConnectionSuggestion, null>
+    const connections = (result as { connections: unknown[] }).connections
+    if (connections.length > 3) {
+      throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+    }
+
+    const allowedIds = new Set(boundedCandidates.map((candidate) => candidate.id))
+    const seenIds = new Set<string>()
+    const suggestions: ReviewSuggestion[] = []
+    for (const connection of connections) {
+      if (
+        typeof connection !== 'object' ||
+        connection === null ||
+        Array.isArray(connection) ||
+        Object.keys(connection).length !== 2
+      ) {
+        throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+      }
+      const targetThoughtId = (connection as { targetThoughtId?: unknown }).targetThoughtId
+      const rationaleValue = (connection as { rationale?: unknown }).rationale
+      const rationale = typeof rationaleValue === 'string' ? rationaleValue.trim() : ''
+      if (
+        typeof targetThoughtId !== 'string' ||
+        !allowedIds.has(targetThoughtId) ||
+        seenIds.has(targetThoughtId) ||
+        !rationale ||
+        rationale.length > 300
+      ) {
+        throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+      }
+      seenIds.add(targetThoughtId)
+      suggestions.push({ targetThoughtId, rationale })
+    }
+
+    return suggestions
   }
 }

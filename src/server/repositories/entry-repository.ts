@@ -123,6 +123,38 @@ export class EntryRepository {
     return data.map(toEntry)
   }
 
+  async claimForReview(userId: string, thoughtId: string, entryId: string) {
+    const { data, error } = await this.client
+      .from('entries')
+      .update({ review_checked_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('thought_id', thoughtId)
+      .eq('id', entryId)
+      .in('entry_type', ['user', 'import'])
+      .is('review_checked_at', null)
+      .select('*')
+      .maybeSingle<EntryRecord>()
+
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to claim review entry')
+    return data ? toEntry(data) : null
+  }
+
+  async firstUserEntry(userId: string, thoughtId: string) {
+    const { data, error } = await this.client
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('thought_id', thoughtId)
+      .in('entry_type', ['user', 'import'])
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle<EntryRecord>()
+
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read review anchor')
+    return data ? toEntry(data) : null
+  }
+
   async findByClientRequest(userId: string, clientRequestId: string) {
     const { data, error } = await this.client
       .from('entries')

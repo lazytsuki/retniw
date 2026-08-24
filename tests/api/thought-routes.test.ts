@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
   updateAction: vi.fn(),
   listRecent: vi.fn(),
   getDetail: vi.fn(),
+  deleteOwned: vi.fn(),
   createEntry: vi.fn(),
   listEntries: vi.fn(),
   decodeThoughtCursor: vi.fn(),
+  scheduleSavedEntryReview: vi.fn(),
 }))
 
 vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
@@ -30,7 +32,11 @@ vi.mock('@/src/server/repositories/thought-repository', () => ({
     updateAction = mocks.updateAction
     listRecent = mocks.listRecent
     getDetail = mocks.getDetail
+    deleteOwned = mocks.deleteOwned
   },
+}))
+vi.mock('@/src/server/review/schedule-saved-entry-review', () => ({
+  scheduleSavedEntryReview: mocks.scheduleSavedEntryReview,
 }))
 vi.mock('@/src/server/repositories/entry-repository', () => ({
   EntryRepository: class {
@@ -42,7 +48,11 @@ vi.mock('@/src/server/repositories/entry-repository', () => ({
 import { GET as listThoughts, POST as createThought } from '@/app/api/thoughts/route'
 import { POST as appendEntry } from '@/app/api/thoughts/[id]/entries/route'
 import { GET as exportThought } from '@/app/api/thoughts/[id]/export.md/route'
-import { GET as getThought, PATCH as updateThought } from '@/app/api/thoughts/[id]/route'
+import {
+  DELETE as deleteThought,
+  GET as getThought,
+  PATCH as updateThought,
+} from '@/app/api/thoughts/[id]/route'
 import ThoughtPage from '@/app/thoughts/[id]/page'
 
 const ids = {
@@ -106,6 +116,12 @@ describe('thought write routes', () => {
       expect.objectContaining({ userId: ids.user, thoughtId: ids.thought, content: body.content }),
     )
     expect(mocks.touch).toHaveBeenCalledWith(ids.user, ids.thought, createdAt)
+    expect(mocks.scheduleSavedEntryReview).toHaveBeenCalledWith({
+      userId: ids.user,
+      thoughtId: ids.thought,
+      entryId: ids.entry,
+      processedThrough: createdAt,
+    })
   })
 
   it('returns the existing result when the same request is retried', async () => {
@@ -116,6 +132,7 @@ describe('thought write routes', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.touch).toHaveBeenCalledWith(ids.user, ids.thought, createdAt)
+    expect(mocks.scheduleSavedEntryReview).toHaveBeenCalledTimes(1)
   })
 
   it('can repair activity time after a partial first attempt', async () => {
@@ -131,6 +148,30 @@ describe('thought write routes', () => {
     expect(first.status).toBe(500)
     expect(retry.status).toBe(200)
     expect(mocks.touch).toHaveBeenCalledTimes(2)
+    expect(mocks.scheduleSavedEntryReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('schedules review after every successful append, including an idempotent retry', async () => {
+    const appendBody = { ...body }
+    delete (appendBody as Partial<typeof body>).thoughtId
+
+    const first = await appendEntry(request(appendBody), {
+      params: Promise.resolve({ id: ids.thought }),
+    })
+    mocks.createEntry.mockResolvedValue({ entry, created: false })
+    const retry = await appendEntry(request(appendBody), {
+      params: Promise.resolve({ id: ids.thought }),
+    })
+
+    expect(first.status).toBe(201)
+    expect(retry.status).toBe(200)
+    expect(mocks.scheduleSavedEntryReview).toHaveBeenCalledTimes(2)
+    expect(mocks.scheduleSavedEntryReview).toHaveBeenLastCalledWith({
+      userId: ids.user,
+      thoughtId: ids.thought,
+      entryId: ids.entry,
+      processedThrough: createdAt,
+    })
   })
 
   it('returns 404 before writing when the thought belongs to another account', async () => {
@@ -144,6 +185,7 @@ describe('thought write routes', () => {
 
     expect(response.status).toBe(404)
     expect(mocks.createEntry).not.toHaveBeenCalled()
+    expect(mocks.scheduleSavedEntryReview).not.toHaveBeenCalled()
   })
 })
 
@@ -166,6 +208,15 @@ describe('thought list route', () => {
       collectionId: undefined,
     })
     expect((await response.json()).data).toEqual(result)
+  })
+
+  it('rejects the removed deleted scope before reading history', async () => {
+    const response = await listThoughts(
+      new NextRequest('http://localhost/api/thoughts?scope=deleted'),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.listRecent).not.toHaveBeenCalled()
   })
 })
 
@@ -192,6 +243,43 @@ describe('thought management route', () => {
 
     expect(response.status).toBe(400)
     expect(mocks.updateAction).not.toHaveBeenCalled()
+  })
+
+  it.each(['delete', 'restore'])('rejects the removed %s management action', async (action) => {
+    const response = await updateThought(
+      new Request(`http://localhost/api/thoughts/${ids.thought}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      }),
+      { params: Promise.resolve({ id: ids.thought }) },
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.updateAction).not.toHaveBeenCalled()
+  })
+
+  it('physically deletes one owned active thought', async () => {
+    mocks.deleteOwned.mockResolvedValue(undefined)
+
+    const response = await deleteThought(
+      new Request(`http://localhost/api/thoughts/${ids.thought}`, { method: 'DELETE' }),
+      { params: Promise.resolve({ id: ids.thought }) },
+    )
+
+    expect(response.status).toBe(204)
+    expect(mocks.deleteOwned).toHaveBeenCalledWith(ids.user, ids.thought)
+  })
+
+  it('maps a missing or already deleted thought to 404 on delete', async () => {
+    mocks.deleteOwned.mockRejectedValue(new ApiError(404, 'NOT_FOUND', 'Thought not found'))
+
+    const response = await deleteThought(
+      new Request(`http://localhost/api/thoughts/${ids.thought}`, { method: 'DELETE' }),
+      { params: Promise.resolve({ id: ids.thought }) },
+    )
+
+    expect(response.status).toBe(404)
   })
 
   it('rejects an invalid entry path id before calling the repository', async () => {

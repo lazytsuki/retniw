@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ApiError } from '@/src/lib/api-error'
-import { EntryRepository, type Entry, type EntryRecord, toEntry } from './entry-repository'
+import { EntryRepository, type Entry } from './entry-repository'
 import { CheckpointRepository } from './checkpoint-repository'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -29,21 +29,14 @@ export type Thought = {
   createdAt: string
 }
 
-type ConnectionRecord = {
-  id: string
-  source_thought_id: string
-  target_thought_id: string
-  source_entry_id: string
-  target_entry_id: string
-  rationale: string
-  status: 'pending' | 'confirmed' | 'rejected'
-  decided_at: string | null
-  created_at: string
-}
-
-type ThoughtAction =
+export type ThoughtAction =
   | { action: 'move'; collectionId: string | null }
-  | { action: 'archive' | 'unarchive' | 'delete' | 'restore' }
+  | { action: 'archive' | 'unarchive' }
+
+export type ReviewCandidate = {
+  id: string
+  summary: string
+}
 
 export function toThought(row: ThoughtRecord): Thought {
   return {
@@ -59,19 +52,6 @@ export function toThought(row: ThoughtRecord): Thought {
 
 export class ThoughtRepository {
   constructor(private readonly client: SupabaseClient) {}
-
-  private async getOwnedAnyState(userId: string, thoughtId: string) {
-    const { data, error } = await this.client
-      .from('thoughts')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', thoughtId)
-      .maybeSingle<ThoughtRecord>()
-
-    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought')
-    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
-    return toThought(data)
-  }
 
   async ensure(userId: string, thoughtId: string) {
     const { data, error } = await this.client
@@ -136,7 +116,7 @@ export class ThoughtRepository {
   async listRecent(
     userId: string,
     cursor?: { lastActivityAt: string; id: string },
-    options: { scope?: 'active' | 'archived' | 'deleted'; collectionId?: string } = {},
+    options: { scope?: 'active' | 'archived'; collectionId?: string } = {},
   ) {
     const scope = options.scope ?? 'active'
     let query = this.client
@@ -149,10 +129,8 @@ export class ThoughtRepository {
 
     if (scope === 'active') {
       query = query.is('deleted_at', null).is('archived_at', null)
-    } else if (scope === 'archived') {
-      query = query.is('deleted_at', null).not('archived_at', 'is', null)
     } else {
-      query = query.not('deleted_at', 'is', null)
+      query = query.is('deleted_at', null).not('archived_at', 'is', null)
     }
     if (options.collectionId) query = query.eq('collection_id', options.collectionId)
 
@@ -189,84 +167,47 @@ export class ThoughtRepository {
     }
   }
 
-  async getDetail(userId: string, thoughtId: string) {
-    const connectionsQuery = this.client
-      .from('thought_connections')
-      .select('*')
+  async listReviewCandidates(
+    userId: string,
+    currentThoughtId: string,
+    excludedThoughtIds: ReadonlySet<string> = new Set(),
+  ): Promise<ReviewCandidate[]> {
+    const excludedIds = Array.from(excludedThoughtIds).filter((id) => UUID_PATTERN.test(id))
+    const query = this.client
+      .from('thoughts')
+      .select('id, summary_content')
       .eq('user_id', userId)
-      .or(`source_thought_id.eq.${thoughtId},target_thought_id.eq.${thoughtId}`)
-      .order('created_at', { ascending: false })
-      .returns<ConnectionRecord[]>()
+      .is('deleted_at', null)
+      .neq('id', currentThoughtId)
+      .in('summary_entry_type', ['user', 'import'])
+      .not('summary_content', 'is', null)
+      .order('last_activity_at', { ascending: false })
+      .order('id', { ascending: false })
 
-    const [thought, entries, checkpoints, connectionsResult] = await Promise.all([
+    if (excludedIds.length) query.not('id', 'in', `(${excludedIds.join(',')})`)
+
+    const { data, error } = await query.limit(20).returns<Array<{
+      id: string
+      summary_content: string | null
+    }>>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to list review candidates')
+
+    return data.flatMap((row) => row.summary_content
+      ? [{ id: row.id, summary: row.summary_content.slice(0, 500) }]
+      : [])
+  }
+
+  async getDetail(userId: string, thoughtId: string) {
+    const [thought, entries, checkpoints] = await Promise.all([
       this.getOwned(userId, thoughtId),
       new EntryRepository(this.client).listByThought(userId, thoughtId),
       new CheckpointRepository(this.client).listByThought(userId, thoughtId),
-      connectionsQuery,
     ])
-
-    if (connectionsResult.error) {
-      throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought connections')
-    }
-
-    let visibleConnections = connectionsResult.data
-    if (visibleConnections.length) {
-      const connectedThoughtIds = Array.from(new Set(visibleConnections.flatMap((connection) => [
-        connection.source_thought_id,
-        connection.target_thought_id,
-      ])))
-      const activeThoughts = await this.client
-        .from('thoughts')
-        .select('id')
-        .eq('user_id', userId)
-        .in('id', connectedThoughtIds)
-        .is('deleted_at', null)
-        .returns<Array<{ id: string }>>()
-      if (activeThoughts.error) {
-        throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connected thoughts')
-      }
-      const activeThoughtIds = new Set(activeThoughts.data.map((item) => item.id))
-      visibleConnections = visibleConnections.filter(
-        (connection) =>
-          activeThoughtIds.has(connection.source_thought_id) &&
-          activeThoughtIds.has(connection.target_thought_id),
-      )
-    }
-
-    const entryIds = visibleConnections.flatMap((connection) => [
-      connection.source_entry_id,
-      connection.target_entry_id,
-    ])
-    const anchorEntries = new Map<string, Entry>()
-    if (entryIds.length) {
-      const anchorsResult = await this.client
-        .from('entries')
-        .select('*')
-        .eq('user_id', userId)
-        .in('id', entryIds)
-        .returns<EntryRecord[]>()
-
-      if (anchorsResult.error) {
-        throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connection entries')
-      }
-      for (const row of anchorsResult.data) anchorEntries.set(row.id, toEntry(row))
-    }
 
     return {
       thought,
       entries,
       checkpoints,
-      connections: visibleConnections.map((connection) => ({
-        id: connection.id,
-        sourceThoughtId: connection.source_thought_id,
-        targetThoughtId: connection.target_thought_id,
-        sourceEntry: anchorEntries.get(connection.source_entry_id) ?? null,
-        targetEntry: anchorEntries.get(connection.target_entry_id) ?? null,
-        rationale: connection.rationale,
-        status: connection.status,
-        decidedAt: connection.decided_at,
-        createdAt: connection.created_at,
-      })),
     }
   }
 
@@ -275,10 +216,7 @@ export class ThoughtRepository {
     thoughtId: string,
     action: ThoughtAction,
   ) {
-    const current = await this.getOwnedAnyState(userId, thoughtId)
-    if (current.deletedAt && action.action !== 'delete' && action.action !== 'restore') {
-      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is deleted')
-    }
+    const current = await this.getOwned(userId, thoughtId)
 
     if (action.action === 'move' && action.collectionId) {
       const collection = await this.client
@@ -298,11 +236,7 @@ export class ThoughtRepository {
       ? { collection_id: action.collectionId }
       : action.action === 'archive'
         ? { archived_at: now }
-        : action.action === 'unarchive'
-          ? { archived_at: null }
-          : action.action === 'delete'
-            ? { deleted_at: now }
-            : { deleted_at: null }
+        : { archived_at: null }
 
     let query = this.client
       .from('thoughts')
@@ -318,10 +252,6 @@ export class ThoughtRepository {
       query = query.is('deleted_at', null).is('archived_at', null)
     } else if (action.action === 'unarchive') {
       query = query.is('deleted_at', null).eq('archived_at', current.archivedAt!)
-    } else if (action.action === 'delete') {
-      query = query.is('deleted_at', null)
-    } else {
-      query = query.eq('deleted_at', current.deletedAt!)
     }
     const { data, error } = await query.select('*').maybeSingle<ThoughtRecord>()
     if (error?.code === '23503') {
@@ -329,20 +259,35 @@ export class ThoughtRepository {
     }
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to update thought')
     if (!data) {
-      const latest = await this.getOwnedAnyState(userId, thoughtId)
+      const latest = await this.getOwned(userId, thoughtId)
       if (thoughtActionSatisfied(latest, action)) return latest
       throw new ApiError(409, 'STATE_CONFLICT', 'Thought state changed')
     }
     return toThought(data)
+  }
+
+  async deleteOwned(userId: string, thoughtId: string) {
+    const { data, error } = await this.client
+      .from('thoughts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', thoughtId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle<{ id: string }>()
+
+    if (error?.code === '23503') {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought cannot be deleted')
+    }
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to delete thought')
+    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
   }
 }
 
 function thoughtActionSatisfied(thought: Thought, action: ThoughtAction) {
   if (action.action === 'move') return thought.collectionId === action.collectionId
   if (action.action === 'archive') return thought.archivedAt !== null
-  if (action.action === 'unarchive') return thought.archivedAt === null
-  if (action.action === 'delete') return thought.deletedAt !== null
-  return thought.deletedAt === null
+  return thought.archivedAt === null
 }
 
 export function encodeThoughtCursor(thought: Pick<ThoughtRecord, 'last_activity_at' | 'id'>) {

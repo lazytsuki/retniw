@@ -6,7 +6,7 @@ import { toEntry } from './entry-repository'
 export type ThoughtConnectionStatus = 'pending' | 'confirmed' | 'rejected'
 export type ThoughtConnectionDecision = 'confirmed' | 'rejected'
 
-type ThoughtConnectionRecord = {
+export type ThoughtConnectionRecord = {
   id: string
   user_id: string
   source_thought_id: string
@@ -18,6 +18,46 @@ type ThoughtConnectionRecord = {
   decided_at: string | null
   created_at: string
 }
+
+export type ReviewConnectionStatus = 'pending' | 'confirmed'
+
+export type ReviewConnection = {
+  id: string
+  status: ReviewConnectionStatus
+  source: { thoughtId: string; entryId: string; excerpt: string }
+  target: { thoughtId: string; entryId: string; excerpt: string }
+  rationale: string
+  decidedAt: string | null
+  createdAt: string
+}
+
+type ReviewAnchorRecord = Pick<EntryRecord, 'id' | 'thought_id' | 'entry_type' | 'content' | 'created_at'>
+
+type ReviewConnectionQueryRecord = ThoughtConnectionRecord & {
+  source_thought: { id: string } | Array<{ id: string }>
+  target_thought: { id: string } | Array<{ id: string }>
+  source_entry: ReviewAnchorRecord | ReviewAnchorRecord[]
+  target_entry: ReviewAnchorRecord | ReviewAnchorRecord[]
+}
+
+const REVIEW_CONNECTION_SELECT = [
+  'id',
+  'user_id',
+  'source_thought_id',
+  'target_thought_id',
+  'source_entry_id',
+  'target_entry_id',
+  'rationale',
+  'status',
+  'decided_at',
+  'created_at',
+  'source_thought:thoughts!thought_connections_source_thought_owner_fk!inner(id)',
+  'target_thought:thoughts!thought_connections_target_thought_owner_fk!inner(id)',
+  'source_entry:entries!thought_connections_source_entry_owner_fk!inner(id,thought_id,entry_type,content,created_at)',
+  'target_entry:entries!thought_connections_target_entry_owner_fk!inner(id,thought_id,entry_type,content,created_at)',
+].join(',')
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function isUnwritableThoughtError(error: { code?: string; message?: string } | null) {
   return error?.code === 'P0001' && error.message?.startsWith('RETNIW_THOUGHT_')
@@ -81,18 +121,18 @@ export class ThoughtConnectionRepository {
     return data
   }
 
-  async pendingForThought(userId: string, thoughtId: string) {
+  async listExistingTargets(userId: string, thoughtId: string) {
     const { data, error } = await this.client
       .from('thought_connections')
-      .select('*')
+      .select('source_thought_id, target_thought_id')
       .eq('user_id', userId)
-      .eq('status', 'pending')
       .or(`source_thought_id.eq.${thoughtId},target_thought_id.eq.${thoughtId}`)
-      .order('created_at', { ascending: false })
-      .returns<ThoughtConnectionRecord[]>()
-    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read pending connection')
-    const [pending] = await this.withActiveThoughts(userId, data)
-    return pending ? this.toView(userId, pending) : null
+      .returns<Array<{ source_thought_id: string; target_thought_id: string }>>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read existing connections')
+
+    return new Set(data.map((record) => record.source_thought_id === thoughtId
+      ? record.target_thought_id
+      : record.source_thought_id))
   }
 
   async createCandidate(input: {
@@ -148,17 +188,81 @@ export class ThoughtConnectionRepository {
     }
   }
 
-  async markChecked(userId: string, thoughtId: string) {
-    const { data, error } = await this.client
-      .from('thoughts')
-      .update({ relation_checked_at: new Date().toISOString() })
+  async listForReview(
+    userId: string,
+    status: ReviewConnectionStatus,
+    cursor?: { createdAt: string; id: string },
+  ) {
+    let query = this.client
+      .from('thought_connections')
+      .select(REVIEW_CONNECTION_SELECT)
       .eq('user_id', userId)
-      .eq('id', thoughtId)
-      .is('deleted_at', null)
-      .select('id')
-      .maybeSingle<{ id: string }>()
-    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to complete relation check')
-    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
+      .eq('status', status)
+      .is('source_thought.deleted_at', null)
+      .is('target_thought.deleted_at', null)
+      .in('source_entry.entry_type', ['user', 'import'])
+      .in('target_entry.entry_type', ['user', 'import'])
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(21)
+
+    if (cursor) {
+      query = query.or(
+        `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+      )
+    }
+
+    const { data, error } = await query.returns<ReviewConnectionQueryRecord[]>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to list review connections')
+
+    const hasMore = data.length > 20
+    const page = data.slice(0, 20)
+    const connections = page.map((record): ReviewConnection => {
+      const storedSource = unwrapRelation(record.source_entry)
+      const storedTarget = unwrapRelation(record.target_entry)
+
+      const sourceIsNewer = storedSource.created_at > storedTarget.created_at || (
+        storedSource.created_at === storedTarget.created_at && storedSource.id > storedTarget.id
+      )
+      const newer = sourceIsNewer ? storedSource : storedTarget
+      const older = sourceIsNewer ? storedTarget : storedSource
+      return {
+        id: record.id,
+        status,
+        source: {
+          thoughtId: newer.thought_id,
+          entryId: newer.id,
+          excerpt: newer.content.slice(0, 1000),
+        },
+        target: {
+          thoughtId: older.thought_id,
+          entryId: older.id,
+          excerpt: older.content.slice(0, 1000),
+        },
+        rationale: record.rationale,
+        decidedAt: record.decided_at,
+        createdAt: record.created_at,
+      }
+    })
+
+    return {
+      connections,
+      nextCursor: hasMore && page.length ? encodeReviewCursor(page.at(-1)!) : null,
+    }
+  }
+
+  async countForReview(userId: string, status: ReviewConnectionStatus) {
+    const { count, error } = await this.client
+      .from('thought_connections')
+      .select(REVIEW_CONNECTION_SELECT, { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', status)
+      .is('source_thought.deleted_at', null)
+      .is('target_thought.deleted_at', null)
+      .in('source_entry.entry_type', ['user', 'import'])
+      .in('target_entry.entry_type', ['user', 'import'])
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to count review connections')
+    return count ?? 0
   }
 
   async decide(userId: string, connectionId: string, decision: ThoughtConnectionDecision) {
@@ -205,4 +309,37 @@ export class ThoughtConnectionRepository {
     if (activeRaced.status === decision) return this.toView(userId, activeRaced)
     throw new ApiError(409, 'STATE_CONFLICT', 'Connection was already decided')
   }
+}
+
+function unwrapRelation<T>(relation: T | T[]) {
+  const value = Array.isArray(relation) ? relation[0] : relation
+  if (!value) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read review relation')
+  return value
+}
+
+export function encodeReviewCursor(
+  connection: Pick<ThoughtConnectionRecord, 'created_at' | 'id'>,
+) {
+  return Buffer.from(JSON.stringify({
+    createdAt: connection.created_at,
+    id: connection.id,
+  })).toString('base64url')
+}
+
+export function decodeReviewCursor(value: string) {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as { createdAt?: unknown }).createdAt === 'string' &&
+      !Number.isNaN(Date.parse((parsed as { createdAt: string }).createdAt)) &&
+      typeof (parsed as { id?: unknown }).id === 'string' &&
+      UUID_PATTERN.test((parsed as { id: string }).id)
+    ) {
+      return parsed as { createdAt: string; id: string }
+    }
+  } catch {}
+
+  throw new ApiError(400, 'INVALID_INPUT', 'Invalid review cursor')
 }

@@ -6,8 +6,10 @@ import { EntryRepository } from '@/src/server/repositories/entry-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
 import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 import { parseThoughtEntryInput } from '@/src/server/thoughts/parse-thought-input'
+import { scheduleSavedEntryReview } from '@/src/server/review/schedule-saved-entry-review'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -32,6 +34,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     await thoughts.touch(user.id, thoughtId, result.entry.createdAt)
     await thoughts.setSummaryIfEmpty(user.id, thoughtId, result.entry)
+    if (result.entry.entryType === 'user' || result.entry.entryType === 'import') {
+      scheduleSavedEntryReview({
+        userId: user.id,
+        thoughtId,
+        entryId: result.entry.id,
+        processedThrough: result.entry.createdAt,
+      })
+    }
     return NextResponse.json({ data: { entry: result.entry } }, { status: result.created ? 201 : 200 })
   } catch (error) {
     return apiErrorResponse(error)

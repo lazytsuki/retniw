@@ -22,7 +22,7 @@ type ThoughtListItemProps = {
   active: boolean
   navigating: boolean
   collections: ThoughtCollection[]
-  mode: 'active' | 'archived' | 'deleted'
+  mode: 'active' | 'archived'
   revealed: boolean
   onChoose?: () => void
   onConceal: () => void
@@ -94,7 +94,7 @@ export function ThoughtListItem({
     const dx = event.clientX - start.current.x
     const dy = event.clientY - start.current.y
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearLongPress()
-    if (mode === 'deleted' || Math.abs(dx) <= Math.abs(dy)) return
+    if (Math.abs(dx) <= Math.abs(dy)) return
     const nextOffset = Math.max(-152, Math.min(0, start.current.offset + dx))
     currentOffset.current = nextOffset
     setDragOffset(nextOffset)
@@ -113,7 +113,7 @@ export function ThoughtListItem({
       })
       return
     }
-    if (mode !== 'deleted' && currentOffset.current < -52) onReveal()
+    if (currentOffset.current < -52) onReveal()
     else onConceal()
     setDragOffset(null)
   }
@@ -130,11 +130,11 @@ export function ThoughtListItem({
         overlay.open(menuId, trigger)
       }}
     >
-      {mode !== 'deleted' && <div className="thought-list-item__swipe-actions" aria-hidden={offset === 0}>
+      <div className="thought-list-item__swipe-actions" aria-hidden={offset === 0}>
         {mode === 'active' && <button type="button" disabled={offset === 0} onClick={(event) => void onAction(thought, 'archive', event.currentTarget)}><ArchiveIcon />归档</button>}
         {mode === 'archived' && <button type="button" disabled={offset === 0} onClick={(event) => void onAction(thought, 'unarchive', event.currentTarget)}><ArchiveIcon />取消归档</button>}
         <button className="danger" type="button" disabled={offset === 0} onClick={(event) => void onAction(thought, 'delete', event.currentTarget)}><TrashIcon />删除</button>
-      </div>}
+      </div>
       <div
         className={[
           'thought-list-item__surface',
@@ -150,26 +150,7 @@ export function ThoughtListItem({
         onPointerUp={pointerEnd}
         onPointerCancel={pointerEnd}
       >
-        {mode === 'deleted' ? <button
-          className="thought-link thought-link--deleted"
-          type="button"
-          onClick={(event) => {
-            if (suppressClick.current) {
-              suppressClick.current = false
-              return
-            }
-            const trigger = actionTrigger()
-            trigger?.focus()
-            overlay.open(menuId, trigger ?? event.currentTarget)
-          }}
-        >
-          <span>{excerpt(thought)}</span>
-          <time dateTime={thought.lastActivityAt}>
-            {new Intl.DateTimeFormat('zh-CN', {
-              month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Shanghai',
-            }).format(new Date(thought.lastActivityAt))}
-          </time>
-        </button> : <Link
+        <Link
           aria-current={active ? 'page' : undefined}
           aria-busy={navigating || undefined}
           className={[
@@ -207,7 +188,7 @@ export function ThoughtListItem({
                   month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Shanghai',
                 }).format(new Date(thought.lastActivityAt))}
           </time>
-        </Link>}
+        </Link>
         <ThoughtActionMenu
           thought={thought}
           menuScope={menuScope}

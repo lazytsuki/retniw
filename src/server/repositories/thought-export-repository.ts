@@ -77,6 +77,7 @@ export class ThoughtExportRepository {
       .from('thoughts')
       .select('id,created_at,last_activity_at,collection_id,archived_at,deleted_at')
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -108,8 +109,9 @@ export class ThoughtExportRepository {
   async listCheckpointPage(userId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
     const { data, error } = await this.client
       .from('thought_checkpoints')
-      .select('id,thought_id,note,created_at')
+      .select('id,thought_id,note,created_at,thought:thoughts!thought_checkpoints_thought_owner_fk!inner(id)')
       .eq('user_id', userId)
+      .is('thought.deleted_at', null)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -121,9 +123,10 @@ export class ThoughtExportRepository {
   async listThoughtCheckpointPage(userId: string, thoughtId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
     const { data, error } = await this.client
       .from('thought_checkpoints')
-      .select('id,thought_id,note,created_at')
+      .select('id,thought_id,note,created_at,thought:thoughts!thought_checkpoints_thought_owner_fk!inner(id)')
       .eq('user_id', userId)
       .eq('thought_id', thoughtId)
+      .is('thought.deleted_at', null)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -135,8 +138,9 @@ export class ThoughtExportRepository {
   async listEntryPage(userId: string, offset: number, limit = EXPORT_PAGE_SIZE) {
     const { data, error } = await this.client
       .from('entries')
-      .select('id,thought_id,entry_type,content,source_label,ai_action,created_at')
+      .select('id,thought_id,entry_type,content,source_label,ai_action,created_at,thought:thoughts!entries_thought_owner_fk!inner(id)')
       .eq('user_id', userId)
+      .is('thought.deleted_at', null)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -161,9 +165,10 @@ export class ThoughtExportRepository {
   ) {
     const { data, error } = await this.client
       .from('entries')
-      .select('id,thought_id,entry_type,content,source_label,ai_action,created_at')
+      .select('id,thought_id,entry_type,content,source_label,ai_action,created_at,thought:thoughts!entries_thought_owner_fk!inner(id)')
       .eq('user_id', userId)
       .eq('thought_id', thoughtId)
+      .is('thought.deleted_at', null)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -184,10 +189,12 @@ export class ThoughtExportRepository {
     const { data, error } = await this.client
       .from('thought_connections')
       .select(
-        'id,source_thought_id,target_thought_id,source_entry_id,target_entry_id,rationale,decided_at,created_at',
+        'id,source_thought_id,target_thought_id,source_entry_id,target_entry_id,rationale,decided_at,created_at,source_thought:thoughts!thought_connections_source_thought_owner_fk!inner(id),target_thought:thoughts!thought_connections_target_thought_owner_fk!inner(id)',
       )
       .eq('user_id', userId)
       .eq('status', 'confirmed')
+      .is('source_thought.deleted_at', null)
+      .is('target_thought.deleted_at', null)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1)

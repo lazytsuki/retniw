@@ -9,9 +9,17 @@ import { ThoughtRepository, type ThoughtRecord } from '@/src/server/repositories
 type StoredRow = Record<string, unknown>
 type Filter = (row: StoredRow) => boolean
 
+function columnValue(row: StoredRow, column: string) {
+  return column.split('.').reduce<unknown>((value, part) => (
+    value && typeof value === 'object' ? (value as StoredRow)[part] : undefined
+  ), row)
+}
+
 class MemoryQuery {
   private filters: Filter[] = []
   private values: StoredRow | null = null
+  private deleting = false
+  private rowLimit: number | null = null
 
   constructor(
     private readonly table: string,
@@ -28,18 +36,42 @@ class MemoryQuery {
     return this
   }
 
+  delete() {
+    this.deleting = true
+    return this
+  }
+
   eq(column: string, value: unknown) {
     this.filters.push((row) => row[column] === value)
     return this
   }
 
+  neq(column: string, value: unknown) {
+    this.filters.push((row) => row[column] !== value)
+    return this
+  }
+
+  lt(column: string, value: string) {
+    this.filters.push((row) => typeof row[column] === 'string' && row[column] < value)
+    return this
+  }
+
   is(column: string, value: unknown) {
-    this.filters.push((row) => row[column] === value)
+    this.filters.push((row) => columnValue(row, column) === value)
     return this
   }
 
   in(column: string, values: unknown[]) {
-    this.filters.push((row) => values.includes(row[column]))
+    this.filters.push((row) => values.includes(columnValue(row, column)))
+    return this
+  }
+
+  not(column: string, operator: string, value: unknown) {
+    if (operator === 'is') this.filters.push((row) => row[column] !== value)
+    if (operator === 'in' && typeof value === 'string') {
+      const values = value.slice(1, -1).split(',')
+      this.filters.push((row) => !values.includes(String(row[column])))
+    }
     return this
   }
 
@@ -57,6 +89,11 @@ class MemoryQuery {
     return this
   }
 
+  limit(value: number) {
+    this.rowLimit = value
+    return this
+  }
+
   async maybeSingle<T>() {
     const rows = this.execute()
     return { data: (rows[0] as T | undefined) ?? null, error: null }
@@ -68,13 +105,20 @@ class MemoryQuery {
 
   private execute() {
     if (this.values && this.table === 'thoughts') this.takeBeforeThoughtUpdate()?.()
-    const rows = (this.tables[this.table] ?? []).filter(
+    const tableRows = this.tables[this.table] ?? []
+    let rows = tableRows.filter(
       (row) => this.filters.every((filter) => filter(row)),
     )
+    if (this.rowLimit !== null) rows = rows.slice(0, this.rowLimit)
     if (this.values) {
       for (const row of rows) Object.assign(row, this.values)
     }
-    return rows.map((row) => ({ ...row }))
+    const result = rows.map((row) => ({ ...row }))
+    if (this.deleting) {
+      const deleted = new Set(rows)
+      this.tables[this.table] = tableRows.filter((row) => !deleted.has(row))
+    }
+    return result
   }
 }
 
@@ -120,6 +164,7 @@ const ids = {
   otherCollection: '018f6f3a-a1c2-47a8-8f1e-900000000005',
   entry: '018f6f3a-a1c2-47a8-8f1e-900000000006',
   otherEntry: '018f6f3a-a1c2-47a8-8f1e-900000000007',
+  aiEntry: '018f6f3a-a1c2-47a8-8f1e-900000000009',
 }
 
 function thought(overrides: Partial<ThoughtRecord> = {}): ThoughtRecord {
@@ -144,7 +189,7 @@ afterEach(() => {
 })
 
 describe('thought lifecycle actions', () => {
-  it('applies all five actions idempotently without replacing state timestamps', async () => {
+  it('applies move and archive actions idempotently without replacing state timestamps', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-22T01:00:00.000Z'))
     const memory = memoryClient({
@@ -170,15 +215,6 @@ describe('thought lifecycle actions', () => {
     await expect(repository.updateAction(ids.user, ids.thought, { action: 'unarchive' }))
       .resolves.toMatchObject({ archivedAt: null })
     await repository.updateAction(ids.user, ids.thought, { action: 'unarchive' })
-
-    const deleted = await repository.updateAction(ids.user, ids.thought, { action: 'delete' })
-    vi.advanceTimersByTime(60_000)
-    const deletedRetry = await repository.updateAction(ids.user, ids.thought, { action: 'delete' })
-    expect(deletedRetry.deletedAt).toBe(deleted.deletedAt)
-
-    await expect(repository.updateAction(ids.user, ids.thought, { action: 'restore' }))
-      .resolves.toMatchObject({ deletedAt: null })
-    await repository.updateAction(ids.user, ids.thought, { action: 'restore' })
   })
 
   it('returns 409 when a conditional update loses to a different state change', async () => {
@@ -196,7 +232,7 @@ describe('thought lifecycle actions', () => {
     })).rejects.toMatchObject({ status: 409, code: 'STATE_CONFLICT' })
   })
 
-  it('does not allow a deleted thought to receive another management action', async () => {
+  it('treats a deleted thought as missing for management actions', async () => {
     const memory = memoryClient({
       thoughts: [thought({ deleted_at: '2026-08-22T01:00:00.000Z' })],
     })
@@ -205,7 +241,24 @@ describe('thought lifecycle actions', () => {
       ids.user,
       ids.thought,
       { action: 'archive' },
-    )).rejects.toMatchObject({ status: 409, code: 'STATE_CONFLICT' })
+    )).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+  })
+
+  it('physically deletes exactly one owned active thought', async () => {
+    const memory = memoryClient({
+      thoughts: [
+        thought(),
+        thought({ id: ids.otherThought, deleted_at: '2026-08-22T01:00:00.000Z' }),
+      ],
+    })
+    const repository = new ThoughtRepository(memory.client)
+
+    await expect(repository.deleteOwned(ids.user, ids.thought)).resolves.toBeUndefined()
+    expect(memory.tables.thoughts).toHaveLength(1)
+    await expect(repository.deleteOwned(ids.user, ids.thought))
+      .rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+    await expect(repository.deleteOwned(ids.user, ids.otherThought))
+      .rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
   })
 })
 
@@ -271,7 +324,7 @@ describe('deleted thought guards', () => {
     })).rejects.toMatchObject({ status: 409, code: 'STATE_CONFLICT' })
   })
 
-  it('removes connections whose other thought is deleted from detail and pending reads', async () => {
+  it('omits connection work when reading thought detail', async () => {
     const connection = {
       id: 'connection-1',
       user_id: ids.user,
@@ -293,18 +346,42 @@ describe('deleted thought guards', () => {
     })
 
     const detail = await new ThoughtRepository(memory.client).getDetail(ids.user, ids.thought)
-    const pending = await new ThoughtConnectionRepository(memory.client)
-      .pendingForThought(ids.user, ids.thought)
-
-    expect(detail.connections).toEqual([])
-    expect(pending).toBeNull()
+    expect(detail).not.toHaveProperty('connections')
   })
 
-  it('makes markChecked fail if deletion won the update race', async () => {
-    const memory = memoryClient({ thoughts: [thought({ deleted_at: '2026-08-22T01:00:00.000Z' })] })
+  it('claims each user entry independently, once, in any callback order and never claims AI', async () => {
+    const entryRow = (input: { id: string; type: 'user' | 'import' | 'ai'; createdAt: string }) => ({
+      id: input.id,
+      user_id: ids.user,
+      thought_id: ids.thought,
+      client_request_id: input.id,
+      entry_type: input.type,
+      content: input.id,
+      source_label: null,
+      ai_action: null,
+      review_checked_at: null,
+      created_at: input.createdAt,
+    })
+    const memory = memoryClient({
+      thoughts: [thought()],
+      entries: [
+        entryRow({ id: ids.entry, type: 'user', createdAt: '2026-08-22T01:00:00.000Z' }),
+        entryRow({ id: ids.otherEntry, type: 'import', createdAt: '2026-08-22T02:00:00.000Z' }),
+        entryRow({ id: ids.aiEntry, type: 'ai', createdAt: '2026-08-22T03:00:00.000Z' }),
+      ],
+    })
+    const repository = new EntryRepository(memory.client)
 
-    await expect(new ThoughtConnectionRepository(memory.client).markChecked(ids.user, ids.thought))
-      .rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+    const newer = await repository.claimForReview(ids.user, ids.thought, ids.otherEntry)
+    const older = await repository.claimForReview(ids.user, ids.thought, ids.entry)
+    expect(newer?.id).toBe(ids.otherEntry)
+    expect(older?.id).toBe(ids.entry)
+    await expect(repository.claimForReview(ids.user, ids.thought, ids.otherEntry))
+      .resolves.toBeNull()
+    await expect(repository.claimForReview(ids.user, ids.thought, ids.entry))
+      .resolves.toBeNull()
+    await expect(repository.claimForReview(ids.user, ids.thought, ids.aiEntry))
+      .resolves.toBeNull()
   })
 
   it('does not decide a connection after either thought was deleted', async () => {
@@ -394,6 +471,89 @@ describe('deleted thought guards', () => {
   })
 })
 
+describe('global review connection view', () => {
+  it('labels the newer anchor as source without changing the normalized stored pair', async () => {
+    const connectionId = '018f6f3a-a1c2-47a8-8f1e-900000000008'
+    const memory = memoryClient({
+      thoughts: [thought(), thought({ id: ids.otherThought })],
+      entries: [
+        {
+          id: ids.entry,
+          user_id: ids.user,
+          thought_id: ids.thought,
+          client_request_id: ids.entry,
+          entry_type: 'user',
+          content: '以前写的',
+          source_label: null,
+          ai_action: null,
+          created_at: '2026-08-22T01:00:00.000Z',
+        },
+        {
+          id: ids.otherEntry,
+          user_id: ids.user,
+          thought_id: ids.otherThought,
+          client_request_id: ids.otherEntry,
+          entry_type: 'import',
+          content: '这次写的',
+          source_label: 'notes.md',
+          ai_action: null,
+          created_at: '2026-08-22T02:00:00.000Z',
+        },
+      ],
+      connections: [{
+        id: connectionId,
+        user_id: ids.user,
+        source_thought_id: ids.thought,
+        target_thought_id: ids.otherThought,
+        source_entry_id: ids.entry,
+        target_entry_id: ids.otherEntry,
+        rationale: '前后都在想同一件事',
+        status: 'pending',
+        decided_at: null,
+        created_at: '2026-08-22T02:01:00.000Z',
+        source_thought: { id: ids.thought, deleted_at: null },
+        target_thought: { id: ids.otherThought, deleted_at: null },
+        source_entry: {
+          id: ids.entry,
+          thought_id: ids.thought,
+          entry_type: 'user',
+          content: '以前写的',
+          created_at: '2026-08-22T01:00:00.000Z',
+        },
+        target_entry: {
+          id: ids.otherEntry,
+          thought_id: ids.otherThought,
+          entry_type: 'import',
+          content: '这次写的',
+          created_at: '2026-08-22T02:00:00.000Z',
+        },
+      }],
+    })
+
+    const result = await new ThoughtConnectionRepository(memory.client)
+      .listForReview(ids.user, 'pending')
+
+    expect(result.connections).toEqual([
+      expect.objectContaining({
+        source: expect.objectContaining({
+          thoughtId: ids.otherThought,
+          entryId: ids.otherEntry,
+          excerpt: '这次写的',
+        }),
+        target: expect.objectContaining({
+          thoughtId: ids.thought,
+          entryId: ids.entry,
+          excerpt: '以前写的',
+        }),
+      }),
+    ])
+    expect(memory.tables.thought_connections[0]).toMatchObject({
+      source_thought_id: ids.thought,
+      target_thought_id: ids.otherThought,
+    })
+  })
+})
+
 describe('lifecycle migration', () => {
   it('installs row-lock guards and an owner-safe collection foreign key', async () => {
     const sql = await readFile(
@@ -413,5 +573,31 @@ describe('lifecycle migration', () => {
     )
     expect(sql).toContain('foreign key (user_id, collection_id)')
     expect(sql).toContain('on delete set null (collection_id)')
+  })
+
+  it('installs default-off private review preferences owned by auth users', async () => {
+    const sql = await readFile(
+      'supabase/migrations/20260824090000_user_review_preferences.sql',
+      'utf8',
+    )
+
+    expect(sql).toMatch(/user_id uuid primary key references auth\.users \(id\) on delete cascade/)
+    expect(sql).toContain('enabled boolean not null default false')
+    expect(sql).toContain('enable row level security')
+    expect(sql).toContain('revoke all on public.user_review_preferences from anon, authenticated')
+    expect(sql).toContain(
+      'grant select, insert, update, delete on public.user_review_preferences to service_role',
+    )
+  })
+
+  it('adds a nullable per-entry review claim marker without changing the prior migration', async () => {
+    const sql = await readFile(
+      'supabase/migrations/20260824150000_entry_review_claim.sql',
+      'utf8',
+    )
+
+    expect(sql).toMatch(/alter table public\.entries/)
+    expect(sql).toMatch(/add column if not exists review_checked_at timestamptz null/)
+    expect(sql).not.toContain('not null')
   })
 })

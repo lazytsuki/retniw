@@ -7,13 +7,13 @@ import type { ThoughtCollection } from '@/src/server/repositories/collection-rep
 import { CollectionPicker } from './collection-picker'
 import { useDismissibleLayer, useOverlayController } from '@/src/components/overlay-provider'
 
-export type ThoughtAction = 'archive' | 'unarchive' | 'delete' | 'restore'
+export type ThoughtAction = 'archive' | 'unarchive' | 'delete'
 
 type ThoughtActionMenuProps = {
   thought: Thought
   menuScope: 'sidebar' | 'history'
   collections: ThoughtCollection[]
-  mode: 'active' | 'archived' | 'deleted'
+  mode: 'active' | 'archived'
   onAction: (action: ThoughtAction) => Promise<void>
   onMove: (collectionId: string | null) => Promise<void>
   onCreateCollection: (name: string) => Promise<ThoughtCollection>
@@ -32,8 +32,8 @@ function TrashIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
 }
 
-function RestoreIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8H3V5M4 8a8 8 0 1 1 1 9M12 8v5l3 2" /></svg>
+function UnarchiveIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v4H3zM9 14h6M12 17v-6M9.5 13.5 12 11l2.5 2.5" /></svg>
 }
 
 export function ThoughtActionMenu({
@@ -169,16 +169,15 @@ export function ThoughtActionMenu({
       role="menu"
       onKeyDown={navigateMenu}
     >
-      {mode !== 'deleted' && <button type="button" role="menuitem" onClick={() => {
+      <button type="button" role="menuitem" onClick={() => {
         setMoveState('idle')
         overlay.open(pickerId)
-      }}><MoveIcon />移入</button>}
+      }}><MoveIcon />移入</button>
       {mode === 'active' && <button type="button" role="menuitem" onClick={() => void run('archive')}><ArchiveIcon />归档</button>}
-      {mode === 'archived' && <button type="button" role="menuitem" onClick={() => void run('unarchive')}><RestoreIcon />取消归档</button>}
-      {mode !== 'deleted' && <div className="thought-action-menu__danger-group" role="group">
+      {mode === 'archived' && <button type="button" role="menuitem" onClick={() => void run('unarchive')}><UnarchiveIcon />取消归档</button>}
+      <div className="thought-action-menu__danger-group" role="group">
         <button className="thought-action-menu__danger" type="button" role="menuitem" onClick={() => void run('delete')}><TrashIcon />删除</button>
-      </div>}
-      {mode === 'deleted' && <button type="button" role="menuitem" onClick={() => void run('restore')}><RestoreIcon />恢复</button>}
+      </div>
     </div>
   ) : pickerOpen ? (
     <div

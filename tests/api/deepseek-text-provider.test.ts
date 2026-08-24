@@ -113,36 +113,55 @@ describe('DeepSeekTextProvider', () => {
     }).rejects.toMatchObject({ code: 'AI_UNAVAILABLE', retryable: true })
   })
 
-  it('accepts only a supplied thought and supplied anchor entries for a connection', async () => {
-    const current = { id: 'current', entries: [{ id: 'current-entry', content: '当前内容' }] }
-    const candidates = [
-      { id: 'candidate', entries: [{ id: 'candidate-entry', content: '候选内容' }] },
-    ]
-    const valid = new DeepSeekTextProvider(
-      'test-key',
-      vi.fn<typeof fetch>().mockResolvedValue(
-        response(
-          '{"targetThoughtId":"candidate","sourceEntryId":"current-entry","targetEntryId":"candidate-entry","rationale":"共同关注同一问题"}',
-        ),
-      ),
-    )
-    await expect(valid.findConnection(current, candidates)).resolves.toEqual({
-      targetThoughtId: 'candidate',
-      sourceEntryId: 'current-entry',
-      targetEntryId: 'candidate-entry',
-      rationale: '共同关注同一问题',
-    })
+  it('returns up to three strictly validated review suggestions from bounded input', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response(JSON.stringify({
+      connections: [
+        { targetThoughtId: 'candidate-1', rationale: '前后都在处理同一个取舍' },
+        { targetThoughtId: 'candidate-2', rationale: '这两段可以放在一起看' },
+      ],
+    })))
+    const provider = new DeepSeekTextProvider('test-key', fetchMock)
 
-    const invalid = new DeepSeekTextProvider(
-      'test-key',
-      vi.fn<typeof fetch>().mockResolvedValue(
-        response(
-          '{"targetThoughtId":"outside","sourceEntryId":"current-entry","targetEntryId":"outside-entry","rationale":"有关"}',
-        ),
-      ),
-    )
-    await expect(invalid.findConnection(current, candidates)).rejects.toMatchObject({
-      code: 'AI_UNAVAILABLE',
-    })
+    await expect(provider.findConnections(
+      { content: '新'.repeat(2500) },
+      Array.from({ length: 21 }, (_, index) => ({
+        id: `candidate-${index + 1}`,
+        summary: '旧'.repeat(600),
+      })),
+    )).resolves.toEqual([
+      { targetThoughtId: 'candidate-1', rationale: '前后都在处理同一个取舍' },
+      { targetThoughtId: 'candidate-2', rationale: '这两段可以放在一起看' },
+    ])
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    const input = JSON.parse(requestBody.messages[1].content)
+    expect(input.source.content).toHaveLength(2000)
+    expect(input.candidates).toHaveLength(20)
+    expect(input.candidates[0].summary).toHaveLength(500)
+  })
+
+  it('rejects unknown, duplicate, overlong or over-limit review suggestions', async () => {
+    const candidates = [{ id: 'candidate-1', summary: '旧想法' }]
+    const invalidPayloads = [
+      { connections: [{ targetThoughtId: 'outside', rationale: '有关' }] },
+      { connections: [
+        { targetThoughtId: 'candidate-1', rationale: '有关' },
+        { targetThoughtId: 'candidate-1', rationale: '还是有关' },
+      ] },
+      { connections: [{ targetThoughtId: 'candidate-1', rationale: '长'.repeat(301) }] },
+      { connections: Array.from({ length: 4 }, () => ({
+        targetThoughtId: 'candidate-1',
+        rationale: '有关',
+      })) },
+    ]
+
+    for (const payload of invalidPayloads) {
+      const provider = new DeepSeekTextProvider(
+        'test-key',
+        vi.fn<typeof fetch>().mockResolvedValue(response(JSON.stringify(payload))),
+      )
+      await expect(provider.findConnections({ content: '这次写的' }, candidates))
+        .rejects.toMatchObject({ code: 'AI_UNAVAILABLE', retryable: true })
+    }
   })
 })

@@ -586,39 +586,6 @@ a.fragment-card:hover {
   opacity: 0.5;
 }
 
-.relation-entry {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 9px;
-  margin-top: 14px;
-  padding: 10px 4px;
-  border: 0;
-  background: transparent;
-  color: rgb(245 245 243 / 40%);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.relation-entry:hover {
-  color: rgb(245 245 243 / 68%);
-}
-
-.relation-entry:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.relation-entry svg {
-  width: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.6;
-}
-
 .mobile-workspace-nav {
   display: none;
 }
@@ -680,11 +647,10 @@ a.fragment-card:hover {
   display: flex;
   min-height: 28px;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
 }
 
 .thought-navigation__heading > button,
-.thought-navigation__sections > button,
 .collection-link button {
   border: 0;
   background: transparent;
@@ -696,9 +662,31 @@ a.fragment-card:hover {
 }
 
 .thought-navigation__heading > button:hover,
-.thought-navigation__sections > button:hover,
 .collection-link button:hover {
   color: rgb(245 245 243 / 76%);
+}
+
+.thought-navigation__heading > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.thought-navigation__heading > button:hover {
+  background: rgb(255 255 255 / 7%);
+}
+
+.thought-navigation__heading > button svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .thought-navigation__sections {
@@ -722,12 +710,58 @@ a.fragment-card:hover {
   font-weight: 520;
 }
 
-.thought-navigation__sections > button,
 .collection-link > button:first-child {
   width: 100%;
   min-width: 0;
   padding: 8px 4px;
   overflow-wrap: anywhere;
+}
+
+.thought-navigation__secondary {
+  display: grid;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.thought-navigation__secondary > button,
+.thought-navigation__secondary > a {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 20px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgb(245 245 243 / 44%);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.thought-navigation__secondary > button:hover,
+.thought-navigation__secondary > a:hover,
+.thought-navigation__secondary > a[aria-current="page"] {
+  background: rgb(255 255 255 / 4%);
+  color: rgb(245 245 243 / 76%);
+}
+
+.thought-navigation__secondary svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.thought-navigation__secondary .thought-navigation__chevron {
+  width: 13px;
+  opacity: 0.55;
 }
 
 .collection-link {
@@ -768,6 +802,10 @@ a.fragment-card:hover {
   min-width: 0;
   padding: 22px 4px;
   border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.thought-entry[id] {
+  scroll-margin-top: 28px;
 }
 
 .thought-entry:first-child {
@@ -1146,88 +1184,6 @@ a.fragment-card:hover {
 
 .ai-unsaved span {
   margin-right: auto;
-}
-
-.relation-status,
-.relation-candidate {
-  margin-top: 18px;
-}
-
-.relation-status {
-  color: rgb(245 245 243 / 38%);
-  font-size: 12px;
-}
-
-.relation-status--error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #d5a09a;
-}
-
-.relation-status button,
-.relation-actions button {
-  padding: 7px 12px;
-  border: 1px solid rgb(255 255 255 / 11%);
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.relation-candidate {
-  padding: 20px;
-  border: 1px solid rgb(255 255 255 / 9%);
-  border-radius: 16px;
-  background: rgb(255 255 255 / 3%);
-}
-
-.relation-pair {
-  display: grid;
-  gap: 10px;
-  margin-top: 13px;
-}
-
-.relation-pair > div {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
-}
-
-.relation-pair span {
-  padding-top: 12px;
-  color: rgb(245 245 243 / 30%);
-  font-size: 11px;
-}
-
-.relation-candidate blockquote {
-  margin: 0;
-  padding: 12px 14px;
-  border-left: 1px solid rgb(255 255 255 / 14%);
-  color: rgb(245 245 243 / 48%);
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.relation-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-  color: rgb(245 245 243 / 64%);
-}
-
-.relation-decision,
-.relation-message {
-  margin: 14px 0 0;
-  color: rgb(245 245 243 / 42%);
-  font-size: 12px;
-}
-
-.relation-message {
-  color: #d5a09a;
 }
 
 .thought-recent {
@@ -1685,6 +1641,11 @@ a.fragment-card:hover {
   color: #fff;
 }
 
+.confirm-dialog button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .confirm-dialog__error {
   color: #d5a09a !important;
 }
@@ -2108,6 +2069,10 @@ a.fragment-card:hover {
 
   .thought-main {
     max-width: 100%;
+  }
+
+  .thought-entry[id] {
+    scroll-margin-top: 82px;
   }
 
   .thought-sidebar {

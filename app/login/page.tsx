@@ -74,7 +74,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <AuthSubmitButton isSignup={isSignup} />
         </form>
         <p className="login-note">
-          请勿记录工作机密；主动使用 AI 时，当前想法会交给 DeepSeek 处理。
+          请勿记录工作机密；主动使用当前想法AI，或开启回看后，必要内容会交给DeepSeek处理。
         </p>
       </section>
     </main>

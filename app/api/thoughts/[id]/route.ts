@@ -33,3 +33,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return apiErrorResponse(error)
   }
 }
+
+export async function DELETE(_request: Request, { params }: RouteContext) {
+  try {
+    const user = await requireUser()
+    const { id: rawId } = await params
+    const id = requireUuid(rawId, 'id')
+    await new ThoughtRepository(createServiceClient()).deleteOwned(user.id, id)
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    return apiErrorResponse(error)
+  }
+}

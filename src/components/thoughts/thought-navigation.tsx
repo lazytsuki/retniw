@@ -12,14 +12,13 @@ import { useOverlayController } from '@/src/components/overlay-provider'
 
 type ThoughtNavigationProps = {
   activeThoughtId: string
+  activeView?: 'review'
   currentStarted: boolean
   initialNextCursor: string | null
   thoughts: ThoughtSummary[]
-  relationRunning: boolean
-  onFindRelations: () => void
 }
 
-type View = { kind: 'recent' | 'archived' | 'deleted' } | { kind: 'collection'; id: string; name: string }
+type View = { kind: 'recent' | 'archived' } | { kind: 'collection'; id: string; name: string }
 
 const explicitNewThoughtKey = 'retniw:explicit-new-thought'
 const openHistoryAfterCheckpointKey = 'retniw:open-history-after-checkpoint'
@@ -57,17 +56,15 @@ export function mergeThoughts(primary: ThoughtSummary[], additional: ThoughtSumm
 function viewTitle(view: View) {
   if (view.kind === 'collection') return view.name
   if (view.kind === 'archived') return '归档'
-  if (view.kind === 'deleted') return '已删除'
   return '以前的想法'
 }
 
 export function ThoughtNavigation({
   activeThoughtId,
+  activeView,
   currentStarted,
   initialNextCursor,
   thoughts,
-  relationRunning,
-  onFindRelations,
 }: ThoughtNavigationProps) {
   const router = useRouter()
   const overlay = useOverlayController()
@@ -86,6 +83,8 @@ export function ThoughtNavigation({
   const [navigatingThoughtId, setNavigatingThoughtId] = useState<string | null>(null)
   const [navigatingNew, setNavigatingNew] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ThoughtSummary | null>(null)
+  const [deletingThought, setDeletingThought] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [pendingCollectionDelete, setPendingCollectionDelete] = useState<ThoughtCollection | null>(null)
   const [deletingCollection, setDeletingCollection] = useState(false)
   const [collectionDeleteError, setCollectionDeleteError] = useState('')
@@ -104,7 +103,6 @@ export function ThoughtNavigation({
     .map((thought) => collectionOverrides.has(thought.id)
       ? { ...thought, collectionId: collectionOverrides.get(thought.id) ?? null }
       : thought)
-  const canFindRelations = currentStarted && recentThoughts.length > 1
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -200,7 +198,6 @@ export function ThoughtNavigation({
     const params = new URLSearchParams()
     if (cursor) params.set('cursor', cursor)
     if (nextView.kind === 'archived') params.set('scope', 'archived')
-    if (nextView.kind === 'deleted') params.set('scope', 'deleted')
     if (nextView.kind === 'collection') params.set('collectionId', nextView.id)
     return `/api/thoughts?${params.toString()}`
   }
@@ -264,7 +261,10 @@ export function ThoughtNavigation({
     setLoading(false)
   }
 
-  async function performAction(thought: ThoughtSummary, action: ThoughtAction) {
+  async function performAction(
+    thought: ThoughtSummary,
+    action: Exclude<ThoughtAction, 'delete'>,
+  ) {
     setRevealedThoughtId(null)
     setRemovedIds((current) => new Set(current).add(thought.id))
     setLoadError('')
@@ -275,8 +275,7 @@ export function ThoughtNavigation({
         body: JSON.stringify({ action }),
       })
       if (!response.ok) throw new Error('ACTION_FAILED')
-      if (action === 'delete' && thought.id === activeThoughtId) router.push('/')
-      else router.refresh()
+      router.refresh()
     } catch {
       setRemovedIds((current) => {
         const next = new Set(current)
@@ -294,10 +293,37 @@ export function ThoughtNavigation({
   ) {
     if (action === 'delete') {
       setPendingDelete(thought)
+      setDeleteError('')
       overlay.open('delete-confirm', trigger)
       return
     }
     await performAction(thought, action)
+  }
+
+  async function deleteThought() {
+    const thought = pendingDelete
+    if (!thought || deletingThought) return
+    setDeletingThought(true)
+    setDeleteError('')
+    setRevealedThoughtId(null)
+    setRemovedIds((current) => new Set(current).add(thought.id))
+    try {
+      const response = await fetch(`/api/thoughts/${thought.id}`, { method: 'DELETE' })
+      if (response.status !== 204) throw new Error('DELETE_FAILED')
+      setPendingDelete(null)
+      overlay.close('delete-confirm')
+      if (thought.id === activeThoughtId) router.push('/')
+      else router.refresh()
+    } catch {
+      setRemovedIds((current) => {
+        const next = new Set(current)
+        next.delete(thought.id)
+        return next
+      })
+      setDeleteError('没有删除，可以重试。')
+    } finally {
+      setDeletingThought(false)
+    }
   }
 
   async function moveThought(thought: ThoughtSummary, collectionId: string | null) {
@@ -321,11 +347,11 @@ export function ThoughtNavigation({
       router.refresh()
     } catch (error) {
       setCollectionOverrides((current) => new Map(current).set(thought.id, previousCollectionId))
-      const restoreThought = (item: ThoughtSummary): ThoughtSummary => (
+      const rollbackThought = (item: ThoughtSummary): ThoughtSummary => (
         item.id === thought.id ? { ...item, collectionId: previousCollectionId } : item
       )
-      setAdditionalThoughts((current) => current.map(restoreThought))
-      setViewThoughts((current) => current.map(restoreThought))
+      setAdditionalThoughts((current) => current.map(rollbackThought))
+      setViewThoughts((current) => current.map(rollbackThought))
       if (view.kind === 'collection' && previousCollectionId === view.id) {
         setRemovedIds((current) => {
           const next = new Set(current)
@@ -388,7 +414,9 @@ export function ThoughtNavigation({
     const list = loading && visibleThoughts.length === 0
       ? <p className="thought-list-loading" role="status">正在加载</p>
       : visibleThoughts.length === 0 && !loadError
-        ? <p className="thought-list-empty">这里还没有想法。</p>
+        ? <p className="thought-list-empty">
+            {view.kind === 'archived' ? '还没有归档的想法。' : '这里还没有想法。'}
+          </p>
       : <div className="thought-list">
           {visibleThoughts.map((thought) => (
             <ThoughtListItem
@@ -396,7 +424,7 @@ export function ThoughtNavigation({
               collections={collections}
               key={thought.id}
               menuScope={menuScope}
-              mode={view.kind === 'archived' ? 'archived' : view.kind === 'deleted' ? 'deleted' : 'active'}
+              mode={view.kind === 'archived' ? 'archived' : 'active'}
               navigating={thought.id === navigatingThoughtId}
               revealed={revealedThoughtId === thought.id}
               thought={thought}
@@ -412,10 +440,12 @@ export function ThoughtNavigation({
         </div>
 
     return <>
-      <div className="thought-navigation__heading">
-        {view.kind !== 'recent' && <button type="button" onClick={showRecent}>全部</button>}
+      {(menuScope === 'sidebar' || view.kind !== 'recent') && <div className="thought-navigation__heading">
+        {view.kind !== 'recent' && <button type="button" aria-label="返回以前的想法" onClick={showRecent}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg>
+        </button>}
         <h2>{viewTitle(view)}</h2>
-      </div>
+      </div>}
       {list}
       {loadError && <p className="thought-list-error" role="status">{loadError}</p>}
       {nextCursor && <button className="load-more-thoughts" type="button" disabled={loading} onClick={() => void loadMore()}>{loading ? '正在加载' : '加载更多'}</button>}
@@ -436,15 +466,23 @@ export function ThoughtNavigation({
             </div>
           ))}
         </section>}
-        <button type="button" onClick={() => void loadView({ kind: 'archived' })}>归档</button>
-        <button type="button" onClick={() => void loadView({ kind: 'deleted' })}>已删除</button>
+        <div className="thought-navigation__secondary">
+          <button type="button" onClick={() => void loadView({ kind: 'archived' })}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v4H3zM9 12h6" /></svg>
+            <span>归档</span>
+            <svg className="thought-navigation__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+          <Link
+            aria-current={activeView === 'review' ? 'page' : undefined}
+            href="/review"
+            onClick={() => menuScope === 'history' && closeHistory()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="8" r="2.5" /><circle cx="18" cy="16" r="2.5" /><path d="M8.4 9.2 15.6 14.8" /></svg>
+            <span>回看</span>
+            <svg className="thought-navigation__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </Link>
+        </div>
       </div>}
-      {view.kind === 'recent' && canFindRelations && (
-        <button className="relation-entry" type="button" disabled={relationRunning} onClick={onFindRelations}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="8" r="2.5" /><circle cx="18" cy="16" r="2.5" /><path d="M8.4 9.2 15.6 14.8" /></svg>
-          {relationRunning ? '正在找联系' : '看看有没有联系'}
-        </button>
-      )}
     </>
   }
 
@@ -466,6 +504,7 @@ export function ThoughtNavigation({
         <button
           ref={historyTriggerRef}
           type="button"
+          aria-current={activeView === 'review' ? 'page' : undefined}
           aria-expanded={historyOpen}
           onClick={(event) => historyOpen ? closeHistory() : openHistory(event.currentTarget)}
         >
@@ -491,20 +530,33 @@ export function ThoughtNavigation({
       <dialog
         className="confirm-dialog"
         ref={deleteDialogRef}
-        onClick={(event) => { if (event.target === event.currentTarget) { setPendingDelete(null); overlay.close('delete-confirm') } }}
-        onCancel={(event) => { event.preventDefault(); setPendingDelete(null); overlay.close('delete-confirm') }}
-        onClose={() => deleteOpen && overlay.close('delete-confirm')}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget || deletingThought) return
+          setPendingDelete(null)
+          setDeleteError('')
+          overlay.close('delete-confirm')
+        }}
+        onCancel={(event) => {
+          event.preventDefault()
+          if (deletingThought) return
+          setPendingDelete(null)
+          setDeleteError('')
+          overlay.close('delete-confirm')
+        }}
+        onClose={() => deleteOpen && !deletingThought && overlay.close('delete-confirm')}
       >
         <h2>删除这个想法？</h2>
-        <p>之后可以在“已删除”中恢复。</p>
+        <p>删除后无法恢复，相关联系也会一并删除。</p>
+        {deleteError && <p className="confirm-dialog__error" role="alert">{deleteError}</p>}
         <div>
-          <button type="button" onClick={() => { setPendingDelete(null); overlay.close('delete-confirm') }}>取消</button>
-          <button className="danger" type="button" onClick={async () => {
-            const thought = pendingDelete
-            overlay.close('delete-confirm')
+          <button type="button" disabled={deletingThought} onClick={() => {
             setPendingDelete(null)
-            if (thought) await performAction(thought, 'delete')
-          }}>删除</button>
+            setDeleteError('')
+            overlay.close('delete-confirm')
+          }}>取消</button>
+          <button className="danger" type="button" disabled={deletingThought} onClick={() => void deleteThought()}>
+            {deletingThought ? '正在删除' : '删除'}
+          </button>
         </div>
       </dialog>
 
