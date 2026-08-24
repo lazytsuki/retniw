@@ -9,7 +9,7 @@ describe('cross-thought review workspace', () => {
 
     expect(page).toContain('<ThoughtNavigation')
     expect(page).toContain('activeView="review"')
-    expect(page).toContain('<ReviewWorkspace />')
+    expect(page).toContain('<ReviewWorkspace initialData={initialReview} />')
     expect(navigation).toContain('href="/review"')
     expect(navigation).toContain("activeView === 'review' ? 'page' : undefined")
     expect(navigation).toContain('<span>回看</span>')
@@ -18,6 +18,21 @@ describe('cross-thought review workspace', () => {
     expect(workspace).not.toContain('<textarea')
     expect(workspace).not.toContain('contentEditable')
     expect(workspace).not.toContain('写在这里')
+  })
+
+  it('renders the first review page from parallel server data without hydration requests', async () => {
+    const page = await readFile('app/review/page.tsx', 'utf8')
+    const workspace = await readFile('src/components/review/review-workspace.tsx', 'utf8')
+
+    expect(page).toContain('const initialReviewPromise = Promise.all([')
+    expect(page).toContain("connections.listForReview(userId, 'pending')")
+    expect(page).toContain("connections.countForReview(userId, 'pending')")
+    expect(page).toContain("connections.listForReview(userId, 'confirmed')")
+    expect(page).toContain('collections.list(userId)')
+    expect(page).toContain('<ReviewWorkspace initialData={initialReview} />')
+    expect(workspace).toContain('useState<ReviewPreference | null>(initialData?.preference ?? null)')
+    expect(workspace).toContain("useState(initialData ? '' : '没有加载完成，可以重试。')")
+    expect(workspace).not.toContain('queueMicrotask(() => void load())')
   })
 
   it('keeps cross-thought processing off until the user opts in', async () => {

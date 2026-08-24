@@ -90,4 +90,4 @@ npm run build
 
 ## 许可证
 
-本项目使用 MIT 许可证，见 [LICENSE](LICENSE)。
+本项目使用 MIT 许可证，见 [LICENSE](LICENSE)。可以个人或商业使用、修改和分发；保留版权和许可声明即可。软件按现状提供，不附带担保。

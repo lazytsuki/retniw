@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ApiError } from '@/src/lib/api-error'
 import { requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
+import { CollectionRepository, type ThoughtCollection } from '@/src/server/repositories/collection-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
 import { requireUuid } from '@/src/server/thoughts/parse-thought-management'
 import { ThoughtWorkspace } from '@/src/components/thoughts/thought-workspace'
@@ -22,12 +23,15 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
   }
   let data: Awaited<ReturnType<ThoughtRepository['getDetail']>>
   let recent: Awaited<ReturnType<ThoughtRepository['listRecent']>>
+  let initialCollections: ThoughtCollection[] | null
   try {
     const user = await requireUser()
-    const repository = new ThoughtRepository(createServiceClient())
-    ;[data, recent] = await Promise.all([
+    const client = createServiceClient()
+    const repository = new ThoughtRepository(client)
+    ;[data, recent, initialCollections] = await Promise.all([
       repository.getDetail(user.id, id),
       repository.listRecent(user.id),
+      new CollectionRepository(client).list(user.id).catch(() => null),
     ])
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect('/login')
@@ -45,6 +49,7 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
         initialThought={data.thought}
         initialEntries={data.entries}
         initialCheckpoints={data.checkpoints}
+        initialCollections={initialCollections}
         initialThoughts={recent.thoughts}
         initialNextCursor={recent.nextCursor}
       />

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { ThoughtSummary } from './thought-workspace'
 import type { ThoughtCollection } from '@/src/server/repositories/collection-repository'
@@ -49,6 +50,7 @@ export function ThoughtListItem({
   onMove,
   onCreateCollection,
 }: ThoughtListItemProps) {
+  const router = useRouter()
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const start = useRef<{ x: number; y: number; offset: number } | null>(null)
   const currentOffset = useRef(0)
@@ -61,6 +63,14 @@ export function ThoughtListItem({
   const triggerId = `thought-action-trigger:${menuScope}:${thought.id}`
   const itemOverlayOpen = overlay.activeId === menuId || overlay.activeId === pickerId
   const offset = dragOffset ?? (revealed ? -152 : 0)
+  const href = `/thoughts/${thought.id}`
+  const prefetchedHref = useRef<string | null>(null)
+
+  function prefetchThought() {
+    if (active || prefetchedHref.current === href) return
+    prefetchedHref.current = href
+    router.prefetch(href)
+  }
 
   function actionTrigger() {
     return document.getElementById(triggerId) as HTMLButtonElement | null
@@ -158,8 +168,12 @@ export function ThoughtListItem({
             active ? 'thought-link--active' : '',
             navigating ? 'thought-link--pending' : '',
           ].filter(Boolean).join(' ')}
-          href={`/thoughts/${thought.id}`}
+          href={href}
           prefetch={false}
+          onMouseEnter={prefetchThought}
+          onPointerEnter={prefetchThought}
+          onFocus={prefetchThought}
+          onTouchStart={prefetchThought}
           onClick={(event) => {
             if (suppressClick.current) {
               event.preventDefault()

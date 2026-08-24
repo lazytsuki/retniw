@@ -1,6 +1,10 @@
-export function ThoughtSkeleton() {
+type ThoughtSkeletonProps = {
+  label?: string
+}
+
+export function ThoughtSkeleton({ label = '正在打开内容' }: ThoughtSkeletonProps = {}) {
   return (
-    <div className="thought-layout thought-skeleton" aria-busy="true" aria-label="正在打开内容">
+    <div className="thought-layout thought-skeleton" role="status" aria-busy="true" aria-label={label}>
       <aside className="thought-sidebar">
         <div className="skeleton-card" />
         <div className="skeleton-card" />

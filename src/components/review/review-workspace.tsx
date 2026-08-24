@@ -1,23 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import styles from './review-workspace.module.css'
-
-type ReviewPreference = {
-  enabled: boolean
-  updatedAt: string | null
-}
-
-type ReviewConnection = {
-  id: string
-  status: 'pending' | 'confirmed'
-  source: { thoughtId: string; entryId: string; excerpt: string }
-  target: { thoughtId: string; entryId: string; excerpt: string }
-  rationale: string
-  decidedAt: string | null
-  createdAt: string
-}
+import type { ReviewPreference } from '@/src/server/repositories/review-preference-repository'
+import type { ReviewConnection } from '@/src/server/repositories/thought-connection-repository'
 
 type ReviewResponse = {
   data?: {
@@ -31,6 +18,13 @@ type ReviewResponse = {
 type ListState = {
   items: ReviewConnection[]
   nextCursor: string | null
+}
+
+type ReviewInitialData = {
+  preference: ReviewPreference
+  pending: ListState
+  pendingCount: number
+  confirmed: ListState
 }
 
 const emptyList: ListState = { items: [], nextCursor: null }
@@ -112,16 +106,16 @@ function ConnectionCard({
   )
 }
 
-export function ReviewWorkspace() {
-  const [preference, setPreference] = useState<ReviewPreference | null>(null)
-  const [pending, setPending] = useState<ListState>(emptyList)
-  const [confirmed, setConfirmed] = useState<ListState>(emptyList)
-  const [pendingCount, setPendingCount] = useState(0)
-  const [loading, setLoading] = useState(true)
+export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialData | null }) {
+  const [preference, setPreference] = useState<ReviewPreference | null>(initialData?.preference ?? null)
+  const [pending, setPending] = useState<ListState>(initialData?.pending ?? emptyList)
+  const [confirmed, setConfirmed] = useState<ListState>(initialData?.confirmed ?? emptyList)
+  const [pendingCount, setPendingCount] = useState(initialData?.pendingCount ?? 0)
+  const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState<'pending' | 'confirmed' | null>(null)
   const [preferencePending, setPreferencePending] = useState(false)
   const [decidingId, setDecidingId] = useState<string | null>(null)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(initialData ? '' : '没有加载完成，可以重试。')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -147,10 +141,6 @@ export function ReviewWorkspace() {
       setLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    queueMicrotask(() => void load())
-  }, [load])
 
   async function setEnabled(enabled: boolean) {
     if (!preference || preferencePending) return

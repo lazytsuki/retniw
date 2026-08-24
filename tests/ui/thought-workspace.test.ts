@@ -235,12 +235,29 @@ describe('thought workspace acceptance boundaries', () => {
     expect(navigation).toContain("visibleThoughts.length === 0 && !loadError")
   })
 
+  it('loads collections with the initial server data instead of after hydration', async () => {
+    const capturePage = await readFile('app/page.tsx', 'utf8')
+    const thoughtPage = await readFile('app/thoughts/[id]/page.tsx', 'utf8')
+    const workspace = await readFile('src/components/thoughts/thought-workspace.tsx', 'utf8')
+    const navigation = await readFile('src/components/thoughts/thought-navigation.tsx', 'utf8')
+
+    expect(capturePage).toContain('Promise.all([')
+    expect(capturePage).toContain('new CollectionRepository(client).list(userId)')
+    expect(thoughtPage).toContain('[data, recent, initialCollections] = await Promise.all([')
+    expect(thoughtPage).toContain('new CollectionRepository(client).list(user.id)')
+    expect(workspace).toContain('initialCollections={initialCollections}')
+    expect(navigation).toContain('useState<ThoughtCollection[]>(initialCollections ?? [])')
+    expect(navigation).toContain('if (initialCollections !== null) return')
+    expect(navigation).toContain("fetch('/api/collections')")
+  })
+
   it('keeps the README focused on the current product path and public entry', async () => {
     const readme = await readFile('README.md', 'utf8')
     expect(readme).toContain('https://retniw.cn')
     expect(readme).toContain('retniw 用来记录和整理自己的想法')
     expect(readme).toContain('平时记录不会自动调用 AI')
     expect(readme).toContain('[LICENSE](LICENSE)')
+    expect(readme).toContain('可以个人或商业使用、修改和分发')
     expect(readme).not.toContain('先记下来，慢慢表达')
     expect(readme).not.toContain('当前线上版本的源码和产品文档')
     expect(readme).not.toContain('retniw.vercel.app')

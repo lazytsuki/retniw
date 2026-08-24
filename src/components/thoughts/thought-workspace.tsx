@@ -22,6 +22,7 @@ import { requestHistoryAfterCheckpoint, ThoughtNavigation } from './thought-navi
 import { ThoughtMenu } from './thought-menu'
 import { CheckpointDialog } from './checkpoint-dialog'
 import type { ThoughtCheckpoint } from '@/src/server/repositories/checkpoint-repository'
+import type { ThoughtCollection } from '@/src/server/repositories/collection-repository'
 import { useOverlayController } from '@/src/components/overlay-provider'
 
 export type ThoughtSummary = Thought & { firstEntry: Entry | null }
@@ -30,6 +31,7 @@ type ThoughtWorkspaceProps = {
   initialThought: Thought | null
   initialEntries: Entry[]
   initialCheckpoints: ThoughtCheckpoint[]
+  initialCollections: ThoughtCollection[] | null
   initialThoughts: ThoughtSummary[]
   initialNextCursor: string | null
 }
@@ -44,6 +46,7 @@ export function ThoughtWorkspace({
   initialThought,
   initialEntries,
   initialCheckpoints,
+  initialCollections,
   initialThoughts,
   initialNextCursor,
 }: ThoughtWorkspaceProps) {
@@ -316,6 +319,7 @@ export function ThoughtWorkspace({
       <ThoughtNavigation
         activeThoughtId={thoughtId}
         currentStarted={started}
+        initialCollections={initialCollections}
         initialNextCursor={initialNextCursor}
         thoughts={displayThoughts}
       />

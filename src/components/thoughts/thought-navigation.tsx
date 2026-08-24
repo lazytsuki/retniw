@@ -14,6 +14,7 @@ type ThoughtNavigationProps = {
   activeThoughtId: string
   activeView?: 'review'
   currentStarted: boolean
+  initialCollections: ThoughtCollection[] | null
   initialNextCursor: string | null
   thoughts: ThoughtSummary[]
 }
@@ -63,6 +64,7 @@ export function ThoughtNavigation({
   activeThoughtId,
   activeView,
   currentStarted,
+  initialCollections,
   initialNextCursor,
   thoughts,
 }: ThoughtNavigationProps) {
@@ -76,7 +78,7 @@ export function ThoughtNavigation({
   const [viewThoughts, setViewThoughts] = useState<ThoughtSummary[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [collectionOverrides, setCollectionOverrides] = useState<Map<string, string | null>>(new Map())
-  const [collections, setCollections] = useState<ThoughtCollection[]>([])
+  const [collections, setCollections] = useState<ThoughtCollection[]>(initialCollections ?? [])
   const [nextCursor, setNextCursor] = useState(initialNextCursor)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -163,13 +165,14 @@ export function ThoughtNavigation({
   }, [overlay.activeId])
 
   useEffect(() => {
+    if (initialCollections !== null) return
     void fetch('/api/collections')
       .then(async (response) => {
         const payload = await response.json() as { data?: { collections?: ThoughtCollection[] } }
         if (response.ok) setCollections(payload.data?.collections ?? [])
       })
       .catch(() => undefined)
-  }, [])
+  }, [initialCollections])
 
   function openHistory(trigger: HTMLButtonElement) {
     overlay.close()
