@@ -238,8 +238,11 @@ describe('thought workspace acceptance boundaries', () => {
   it('keeps the README focused on the current product path and public entry', async () => {
     const readme = await readFile('README.md', 'utf8')
     expect(readme).toContain('https://retniw.cn')
-    expect(readme).toContain('先记下来，慢慢表达，之后回来时看见联系')
-    expect(readme).toContain('AI 默认不回应')
+    expect(readme).toContain('retniw 用来记录和整理自己的想法')
+    expect(readme).toContain('平时记录不会自动调用 AI')
+    expect(readme).toContain('[LICENSE](LICENSE)')
+    expect(readme).not.toContain('先记下来，慢慢表达')
+    expect(readme).not.toContain('当前线上版本的源码和产品文档')
     expect(readme).not.toContain('retniw.vercel.app')
     expect(readme).not.toContain('## 第二版')
     expect(readme).not.toContain('## 小范围内测')

@@ -1,40 +1,36 @@
 # retniw
 
-先记下来，慢慢表达，之后回来时看见联系。
+retniw 用来记录和整理自己的想法。可以先写一句，以后再接着写；想法多了，也能回头看看它们之间有没有联系。
 
-[在线体验](https://retniw.cn)
+[打开 retniw](https://retniw.cn)
 
-retniw 是一处写想法的地方。一个念头可以只留一句，也可以在同一个想法里继续长出来。内容可以从别处进入，也可以完整带走。
+## 怎么用
 
-这是 retniw 当前线上版本的源码和产品文档。
+1. 打开就写，不用先分类，也不用先和 AI 对话。
+2. 同一个想法可以接着写。暂时不想写了，可以点“先到这里”，以后再回来。
+3. 想法多了以后，可以开启“回看”。retniw 会找出可能相关的旧想法，由你决定是否保留这条联系。
 
-## 从记录到回看
+以前的想法可以移入合集，也可以归档或删除。归档后不再出现在常用列表；删除后无法恢复，相关联系也会一起删除。
 
-1. **记下来**：打开就写，不需要先选分类，也不需要先和 AI 对话。
-2. **慢慢表达**：在同一个想法里继续写；想告一段落时可以“先到这里”，以后再回来。
-3. **看见联系**：想法积累后，可以开启“回看”。retniw 会找出有原文依据的联系候选，是否保留由用户决定。
+## AI
 
-以前的想法可以移入单层合集、归档或删除。归档只把内容移出常用列表；删除会永久移除想法及相关联系。
+平时记录不会自动调用 AI。
 
-## AI 如何参与
+- 点“帮我接着想”或“整理”时，AI 只读取当前想法里你写入或导入的内容。
+- “回看”默认关闭。开启后，retniw 会在新内容保存后寻找相关的旧想法。
+- AI 生成的内容不会算作你的原文，也不会自动改写内容或保留联系。
 
-用户的写作和思考始终是主体，AI 默认不回应。
+使用这些功能时，相关文字会发送给 DeepSeek。不要写入工作机密或其他不应交给 Supabase、Vercel、DeepSeek 处理的信息。
 
-- 只有主动选择“帮我接着想”或“整理”时，AI 才读取当前想法中的用户原文和导入内容。
-- 跨想法“回看”默认关闭。明确开启后，新内容保存完成才会在后台寻找候选联系，不阻塞记录。
-- AI 输出不会被当成用户原文，也不会自动改写内容或替用户保留联系。
+## 导入和导出
 
-只有使用当前想法 AI，或开启跨想法回看后，必要内容才会交给 DeepSeek 处理。不要写入工作机密或其他不应交给 Supabase、Vercel、DeepSeek 处理的信息。
-
-## 内容可以进，也可以走
-
-- 支持直接粘贴文字，或导入 `.md`、`.txt` 文件。
-- 支持复制单段、导出一个想法的 Markdown，以及导出全部内容和已确认关系的 JSON。
-- 手机和桌面端使用同一份内容；账号之间的想法、合集、关系和导出互不公开。
+- 可以粘贴文字，也可以导入 `.md`、`.txt` 文件。
+- 可以复制单段、把一个想法导出为 Markdown，或者把全部内容和已确认的关系导出为 JSON。
+- 同一账号可以在手机和桌面端使用；每个账号只能看到自己的内容。
 
 ## 当前状态
 
-retniw 正在持续内测，注册入口已开放。体验者可以在 [retniw.cn](https://retniw.cn) 自行创建账号，不需要邀请码或项目所有者代建账号。
+retniw 还在内测，注册已经开放。打开 [retniw.cn](https://retniw.cn) 可以直接创建账号，不需要邀请码。
 
 ## 技术栈
 
@@ -45,7 +41,7 @@ retniw 正在持续内测，注册入口已开放。体验者可以在 [retniw.c
 
 ## 本地开发
 
-需要 Node.js 20.9 或更高版本，以及一个已经具备当前业务表结构的 Supabase 项目。
+需要 Node.js 20.9 或更高版本，以及一个已经创建 retniw 所需数据表的 Supabase 项目。
 
 ```bash
 npm install
@@ -70,7 +66,7 @@ npm run dev
 
 浏览器打开 [http://localhost:3000](http://localhost:3000)。
 
-> 当前仓库还不是一键自托管发行包：现有 `supabase/migrations` 只包含增量变更，缺少从空项目重建基础业务表的完整迁移。根目录的 `supabase-schema.sql` 属于早期原型，不能用于初始化当前版本。数据库契约以 [TECH-DESIGN.md](TECH-DESIGN.md) 和现有迁移为准。
+> 目前还不能从空的 Supabase 项目直接启动。`supabase/migrations` 只包含增量变更；根目录的 `supabase-schema.sql` 是早期原型，也不能用于初始化当前版本。现有表结构见 [TECH-DESIGN.md](TECH-DESIGN.md) 和 `supabase/migrations`。
 
 ## 验证
 
@@ -83,15 +79,15 @@ npm run build
 
 ## 项目文档
 
-- [REQUIREMENT-ANALYSIS.md](REQUIREMENT-ANALYSIS.md)：问题背景与产品判断
-- [PRD.md](PRD.md)：当前产品契约与核心流程
-- [TECH-DESIGN.md](TECH-DESIGN.md)：实现、数据与安全边界
-- [WORKFLOW-STATE.md](WORKFLOW-STATE.md)：当前交付状态与验证记录
+- [REQUIREMENT-ANALYSIS.md](REQUIREMENT-ANALYSIS.md)：为什么做
+- [PRD.md](PRD.md)：当前功能和流程
+- [TECH-DESIGN.md](TECH-DESIGN.md)：实现和数据结构
+- [WORKFLOW-STATE.md](WORKFLOW-STATE.md)：开发与验证记录
 
 ## 参与项目
 
-发现问题或有新的使用反馈，可以提交 [Issue](https://github.com/lazytsuki/retniw/issues)。涉及产品路径的建议，请同时说明真实使用场景和遇到的断点，方便判断它是否符合 retniw 的核心链路。
+发现问题或有建议，可以提交 [Issue](https://github.com/lazytsuki/retniw/issues)。如果是功能建议，请说一下你当时在做什么、哪里不好用。
 
 ## 许可证
 
-仓库尚未添加 `LICENSE`，开源授权范围仍待明确。
+本项目使用 MIT 许可证，见 [LICENSE](LICENSE)。
