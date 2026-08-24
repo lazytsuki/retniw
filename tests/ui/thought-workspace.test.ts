@@ -235,13 +235,13 @@ describe('thought workspace acceptance boundaries', () => {
     expect(navigation).toContain("visibleThoughts.length === 0 && !loadError")
   })
 
-  it('uses the public domain as the only beta entry and scopes the legacy redirect', async () => {
+  it('keeps the README focused on the current product path and public entry', async () => {
     const readme = await readFile('README.md', 'utf8')
     expect(readme).toContain('https://retniw.cn')
-    expect(readme).toContain('retniw.vercel.app')
-    expect(readme).toContain('内测只使用')
-    expect(readme).toContain('HTTP 308')
-    expect(readme).toContain('DNS 解析可能被污染')
-    expect(readme).not.toContain('已永久跳转到新域名')
+    expect(readme).toContain('先记下来，慢慢表达，之后回来时看见联系')
+    expect(readme).toContain('AI 默认不回应')
+    expect(readme).not.toContain('retniw.vercel.app')
+    expect(readme).not.toContain('## 第二版')
+    expect(readme).not.toContain('## 小范围内测')
   })
 })
