@@ -2115,6 +2115,16 @@ a.fragment-card:hover {
     cursor: pointer;
   }
 
+  .mobile-workspace-nav > a:focus,
+  .mobile-workspace-nav > button:focus {
+    outline: none;
+  }
+
+  .mobile-workspace-nav > a:focus-visible,
+  .mobile-workspace-nav > button:focus-visible {
+    box-shadow: inset 0 0 0 1px rgb(191 216 208 / 42%);
+  }
+
   .mobile-workspace-nav svg {
     width: 18px;
     fill: none;
