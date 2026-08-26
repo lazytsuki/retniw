@@ -82,7 +82,7 @@ try {
         thought_id: thoughtId,
         client_request_id: nextUserEntryId,
         entry_type: 'user',
-        content: `第 ${index + 1} 次验证的新输入。`,
+        content: `第 ${index + 1} 次测试输入。`,
       })
       assert.ifError(nextUserEntry.error)
     }

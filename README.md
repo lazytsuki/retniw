@@ -12,11 +12,14 @@ retniw 用来记录和整理自己的想法。可以先写一句，以后再接�
 
 以前的想法可以移入合集，也可以归档或删除。归档后不再出现在常用列表；删除后无法恢复，相关联系也会一起删除。
 
+登录后，右上角显示当前邮箱。可以设置或清除昵称；昵称只在需要直接称呼时使用，不改变内容归属。
+
 ## AI
 
 平时记录不会自动调用 AI。
 
 - 点“帮我接着想”或“整理”时，AI 只读取当前想法里你写入或导入的内容。
+- 设置昵称后，这些当前想法的 AI 请求会把昵称作为受限的称呼标签一并发送；标签不被当作身份、事实或指令。
 - “回看”默认关闭。首次开启或之后点击“开始串联”时，retniw 会把当前账号最多20条最近想法的开头片段交给 DeepSeek，单次最多提出3条候选；开启后，新内容保存完成也会在后台寻找相关的旧想法。
 - AI 生成的内容不会算作你的原文，也不会自动改写内容或保留联系。
 
@@ -27,10 +30,6 @@ retniw 用来记录和整理自己的想法。可以先写一句，以后再接�
 - 可以粘贴文字，也可以导入 `.md`、`.txt` 文件。
 - 可以复制单段、把一个想法导出为 Markdown，或者把全部内容和已确认的关系导出为 JSON。
 - 同一账号可以在手机和桌面端使用；每个账号只能看到自己的内容。
-
-## 当前状态
-
-retniw 还在内测，注册已经开放。打开 [retniw.cn](https://retniw.cn) 可以直接创建账号，不需要邀请码。
 
 ## 技术栈
 
@@ -66,7 +65,7 @@ npm run dev
 
 浏览器打开 [http://localhost:3000](http://localhost:3000)。
 
-> 目前还不能从空的 Supabase 项目直接启动。`supabase/migrations` 只包含增量变更；根目录的 `supabase-schema.sql` 是早期原型，也不能用于初始化当前版本。现有表结构见 [TECH-DESIGN.md](TECH-DESIGN.md) 和 `supabase/migrations`。
+> 本仓库只包含增量数据库迁移，不能直接初始化空的 Supabase 项目。`supabase-schema.sql` 不适用于当前应用；数据结构与迁移说明见 [TECH-DESIGN.md](TECH-DESIGN.md) 和 `supabase/migrations`。
 
 ## 验证
 
@@ -82,7 +81,6 @@ npm run build
 - [REQUIREMENT-ANALYSIS.md](REQUIREMENT-ANALYSIS.md)：为什么做
 - [PRD.md](PRD.md)：当前功能和流程
 - [TECH-DESIGN.md](TECH-DESIGN.md)：实现和数据结构
-- [WORKFLOW-STATE.md](WORKFLOW-STATE.md)：开发与验证记录
 
 ## 参与项目
 

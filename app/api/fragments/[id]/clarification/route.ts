@@ -48,7 +48,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ data: { clarification: toClarification(existing.data) } })
     }
 
-    const question = await new DeepSeekTextProvider().clarify(fragment.content)
+    const question = await new DeepSeekTextProvider().clarify(fragment.content, user.nickname)
     const inserted = await service
       .from('clarifications')
       .insert({ user_id: user.id, fragment_id: fragment.id, question })

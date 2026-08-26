@@ -140,7 +140,7 @@ try {
     entryId,
     clientRequestId,
     entryType: 'user',
-    content: '持续思考接口真实验收',
+    content: '持续思考接口测试',
     sourceLabel: null,
   }
 

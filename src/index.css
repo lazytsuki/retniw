@@ -58,10 +58,8 @@ a {
 
 .app-shell {
   width: 100%;
-  max-width: 1440px;
   min-height: 100vh;
-  margin: 0 auto;
-  padding: 0 max(32px, env(safe-area-inset-right)) 24px max(32px, env(safe-area-inset-left));
+  padding: 0 max(24px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
 }
 
 .app-header {
@@ -86,8 +84,8 @@ a {
 }
 
 .app-header--sidebar-collapsed {
-  --workspace-sidebar-width: 64px;
-  column-gap: clamp(32px, 5vw, 72px);
+  --workspace-sidebar-width: 52px;
+  column-gap: 16px;
 }
 
 .app-header__sidebar {
@@ -221,12 +219,17 @@ a {
 }
 
 .account-menu > button {
+  display: block;
+  max-width: min(32vw, 240px);
   padding: 8px 10px;
+  overflow: hidden;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: inherit;
   font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -241,8 +244,8 @@ a {
   z-index: 80;
   top: calc(100% + 8px);
   right: 0;
-  width: 132px;
-  padding: 6px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 13px;
   background: rgb(17 20 23 / 94%);
@@ -251,14 +254,103 @@ a {
   -webkit-backdrop-filter: blur(24px);
 }
 
-.account-menu__panel button {
+.account-menu__identity {
+  display: grid;
+  gap: 5px;
+  padding: 2px 2px 13px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.account-menu__identity > span,
+.account-menu__nickname-form > label,
+.account-menu__hint {
+  color: rgb(245 245 243 / 36%);
+  font-size: 11px;
+}
+
+.account-menu__email {
+  color: rgb(245 245 243 / 76%);
+  font-size: 13px;
+  font-weight: 510;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.account-menu__nickname-form {
+  display: grid;
+  gap: 7px;
+  padding: 13px 2px;
+}
+
+.account-menu__nickname-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.account-menu__input {
   width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 9px;
+  outline: none;
+  background: rgb(0 0 0 / 18%);
+  color: rgb(245 245 243 / 86%);
+  font-size: 12px;
+}
+
+.account-menu__input:focus {
+  border-color: rgb(191 216 208 / 30%);
+  box-shadow: 0 0 0 2px rgb(191 216 208 / 6%);
+}
+
+.account-menu__nickname-row > button {
+  width: auto;
+  min-width: 54px;
+  padding-inline: 11px;
+  text-align: center;
+}
+
+.account-menu__nickname-row > button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.account-menu__hint,
+.account-menu__feedback {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.account-menu__feedback {
+  font-size: 11px;
+}
+
+.account-menu__feedback--success {
+  color: rgb(191 216 208 / 72%);
+}
+
+.account-menu__feedback--error {
+  color: #d5a09a;
+}
+
+.account-menu__panel > form:last-child {
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.account-menu__panel > form:last-child button {
+  width: 100%;
+  text-align: left;
+}
+
+.account-menu__panel button {
   padding: 9px 10px;
   border: 0;
   border-radius: 9px;
   background: transparent;
   color: rgb(245 245 243 / 68%);
-  text-align: left;
   cursor: pointer;
 }
 
@@ -505,8 +597,8 @@ a.fragment-card:hover {
 }
 
 .thought-layout--sidebar-collapsed {
-  --workspace-sidebar-width: 64px;
-  gap: clamp(32px, 5vw, 72px);
+  --workspace-sidebar-width: 52px;
+  gap: 16px;
 }
 
 .thought-main {
@@ -2388,6 +2480,55 @@ a.fragment-card:hover {
   line-height: 1.6;
 }
 
+.auth-transition-shell {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-transition {
+  text-align: center;
+}
+
+.auth-transition__mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 18px;
+  place-items: center;
+  border: 1px solid rgb(191 216 208 / 22%);
+  border-radius: 50%;
+  background: rgb(191 216 208 / 8%);
+  color: var(--accent);
+}
+
+.auth-transition__mark svg {
+  width: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.auth-transition h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 540;
+  letter-spacing: -0.02em;
+}
+
+.auth-transition .muted {
+  margin: 10px 0 20px;
+}
+
+.auth-transition > a {
+  color: rgb(245 245 243 / 56%);
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+
 .login-form label {
   display: grid;
   gap: 8px;
@@ -2434,6 +2575,7 @@ a.fragment-card:hover {
 @media (max-width: 900px) {
   .app-shell {
     max-width: 732px;
+    margin: 0 auto;
     padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
     padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }

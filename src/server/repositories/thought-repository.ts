@@ -4,6 +4,7 @@ import { EntryRepository, type Entry } from './entry-repository'
 import { CheckpointRepository } from './checkpoint-repository'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const LIST_RECENT_RETRY_DELAY_MS = 120
 
 export type ThoughtRecord = {
   id: string
@@ -119,29 +120,43 @@ export class ThoughtRepository {
     options: { scope?: 'active' | 'archived'; collectionId?: string } = {},
   ) {
     const scope = options.scope ?? 'active'
-    let query = this.client
-      .from('thoughts')
-      .select('*')
-      .eq('user_id', userId)
-      .order('last_activity_at', { ascending: false })
-      .order('id', { ascending: false })
-      .limit(21)
+    const readPage = async () => {
+      let query = this.client
+        .from('thoughts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('last_activity_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(21)
 
-    if (scope === 'active') {
-      query = query.is('deleted_at', null).is('archived_at', null)
-    } else {
-      query = query.is('deleted_at', null).not('archived_at', 'is', null)
+      if (scope === 'active') {
+        query = query.is('deleted_at', null).is('archived_at', null)
+      } else {
+        query = query.is('deleted_at', null).not('archived_at', 'is', null)
+      }
+      if (options.collectionId) query = query.eq('collection_id', options.collectionId)
+
+      if (cursor) {
+        query = query.or(
+          `last_activity_at.lt.${cursor.lastActivityAt},and(last_activity_at.eq.${cursor.lastActivityAt},id.lt.${cursor.id})`,
+        )
+      }
+
+      return await query
     }
-    if (options.collectionId) query = query.eq('collection_id', options.collectionId)
 
-    if (cursor) {
-      query = query.or(
-        `last_activity_at.lt.${cursor.lastActivityAt},and(last_activity_at.eq.${cursor.lastActivityAt},id.lt.${cursor.id})`,
-      )
+    let result = await readPage()
+    if (result.error) {
+      await new Promise((resolve) => setTimeout(resolve, LIST_RECENT_RETRY_DELAY_MS))
+      result = await readPage()
     }
-
-    const result = await query
-    if (result.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to list thoughts')
+    if (result.error) {
+      console.error('Unable to list thoughts', {
+        code: result.error.code,
+        status: result.status,
+      })
+      throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to list thoughts')
+    }
 
     const rows = (result.data ?? []) as unknown as ThoughtRecord[]
     const hasMore = rows.length > 20

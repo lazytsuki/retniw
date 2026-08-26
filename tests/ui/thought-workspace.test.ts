@@ -68,7 +68,8 @@ describe('thought workspace acceptance boundaries', () => {
     const css = await readFile('src/index.css', 'utf8')
     expect(css).toContain('--workspace-sidebar-width: clamp(230px, 20vw, 280px)')
     expect(css).toContain('grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr)')
-    expect(css).toMatch(/\.thought-layout--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 64px/)
+    expect(css).toMatch(/\.thought-layout--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*gap: 16px;/)
+    expect(css).toMatch(/\.app-header--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*column-gap: 16px;/)
     expect(css).toMatch(/@media \(min-width: 901px\)[\s\S]*\.app-header \{[\s\S]*position: sticky/)
     expect(css).toMatch(/\.thought-sidebar \{[\s\S]*top: calc\(48px \+ var\(--thought-sidebar-top\)\)/)
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.thought-layout[\s\S]*grid-template-columns: 1fr/)
@@ -82,7 +83,12 @@ describe('thought workspace acceptance boundaries', () => {
 
   it('keeps page chrome and action groups inside narrow mobile viewports', async () => {
     const css = await readFile('src/index.css', 'utf8')
-    expect(css).toMatch(/\.app-shell \{[\s\S]*width: 100%;[\s\S]*max-width: 1440px;/)
+    const shellRule = css.match(/\.app-shell \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(shellRule).toContain('width: 100%')
+    expect(shellRule).not.toContain('max-width: 1440px')
+    expect(shellRule).not.toContain('margin: 0 auto')
+    expect(shellRule).toContain('max(16px, env(safe-area-inset-left))')
+    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.app-shell \{[\s\S]*max-width: 732px;[\s\S]*margin: 0 auto;/)
     expect(css).toMatch(/\.app-header \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto/)
     expect(css).toContain('padding-bottom: calc(80px + env(safe-area-inset-bottom))')
     expect(css).toMatch(/@media \(max-width: 560px\)[\s\S]*\.thinking-assist/)
@@ -206,7 +212,7 @@ describe('thought workspace acceptance boundaries', () => {
     expect(scrollRule).toContain('overflow-x: hidden')
     expect(scrollRule).toContain('overflow-y: auto')
     expect(footerRule).toContain('flex: 0 0 auto')
-    expect(shellRule).toContain('24px max(32px, env(safe-area-inset-left))')
+    expect(shellRule).toContain('24px max(16px, env(safe-area-inset-left))')
     expect(css).not.toMatch(/\.thought-link:hover \{[\s\S]*?translateX/)
   })
 
@@ -341,9 +347,6 @@ describe('thought workspace acceptance boundaries', () => {
     expect(readme).toContain('[LICENSE](LICENSE)')
     expect(readme).toContain('可以个人或商业使用、修改和分发')
     expect(readme).not.toContain('先记下来，慢慢表达')
-    expect(readme).not.toContain('当前线上版本的源码和产品文档')
     expect(readme).not.toContain('retniw.vercel.app')
-    expect(readme).not.toContain('## 第二版')
-    expect(readme).not.toContain('## 小范围内测')
   })
 })

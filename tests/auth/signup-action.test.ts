@@ -73,11 +73,22 @@ describe('signup action', () => {
       error: null,
     })
 
-    await expect(signup(signupForm())).rejects.toMatchObject({ url: '/' })
+    await expect(signup(signupForm())).rejects.toMatchObject({ url: '/auth/created' })
     expect(mocks.signUp).toHaveBeenCalledWith({
       email: 'friend@example.com',
       password: 'password',
     })
+  })
+
+  it('uses a lightweight success page before the first workspace request', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const transition = await readFile('app/auth/created/account-created-transition.tsx', 'utf8')
+    const page = await readFile('app/auth/created/page.tsx', 'utf8')
+
+    expect(transition).toContain('账号创建成功')
+    expect(transition).toContain("window.location.replace('/')")
+    expect(transition).toContain('立即进入')
+    expect(page).toContain('await requireUser()')
   })
 
   it('shows the confirmation state when Supabase requires email confirmation', async () => {

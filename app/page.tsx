@@ -10,13 +10,14 @@ import { AppHeader } from '@/src/components/app-header'
 export const dynamic = 'force-dynamic'
 
 export default async function CapturePage() {
-  let userId = ''
+  let user: Awaited<ReturnType<typeof requireUser>>
   try {
-    userId = (await requireUser()).id
+    user = await requireUser()
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect('/login')
     throw error
   }
+  const userId = user.id
 
   const client = createServiceClient()
   const [recent, initialCollections] = await Promise.all([
@@ -26,7 +27,7 @@ export default async function CapturePage() {
 
   return (
     <main className="app-shell">
-      <AppHeader />
+      <AppHeader account={{ email: user.email, nickname: user.nickname }} />
       <ThoughtWorkspace
         key="new-thought"
         initialThought={null}

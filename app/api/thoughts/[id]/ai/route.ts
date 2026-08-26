@@ -76,7 +76,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         let content = ''
         try {
           const provider = new DeepSeekTextProvider()
-          for await (const delta of provider.streamText(action, thoughtEntries, request.signal)) {
+          for await (const delta of provider.streamText(
+            action,
+            thoughtEntries,
+            request.signal,
+            user.nickname,
+          )) {
             content += delta
             if (content.length > 20_000) {
               throw new ApiError(503, 'AI_UNAVAILABLE', 'AI output is too long', true)

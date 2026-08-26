@@ -67,8 +67,8 @@ async function createThought(userId, content) {
 try {
   const owner = await createUser('owner')
   const other = await createUser('other')
-  const first = await createThought(owner.id, '第一段关系验收内容')
-  const second = await createThought(owner.id, '第二段关系验收内容')
+  const first = await createThought(owner.id, '第一段关系测试内容')
+  const second = await createThought(owner.id, '第二段关系测试内容')
   await createThought(other.id, '只有一个过程时不应虚构关系')
 
   const anonymousScan = await fetch(`${baseUrl}/api/review/scan`, {
@@ -99,7 +99,7 @@ try {
     target_thought_id: target.thoughtId,
     source_entry_id: source.entryId,
     target_entry_id: target.entryId,
-    rationale: '真实唯一约束验收',
+    rationale: '唯一约束测试',
   }
   const inserts = await Promise.all(
     [0, 1].map(() =>

@@ -24,8 +24,9 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
   let data: Awaited<ReturnType<ThoughtRepository['getDetail']>>
   let recent: Awaited<ReturnType<ThoughtRepository['listRecent']>>
   let initialCollections: ThoughtCollection[] | null
+  let user: Awaited<ReturnType<typeof requireUser>>
   try {
-    const user = await requireUser()
+    user = await requireUser()
     const client = createServiceClient()
     const repository = new ThoughtRepository(client)
     ;[data, recent, initialCollections] = await Promise.all([
@@ -43,7 +44,7 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
 
   return (
     <main className="app-shell">
-      <AppHeader />
+      <AppHeader account={{ email: user.email, nickname: user.nickname }} />
       <ThoughtWorkspace
         key={data.thought.id}
         initialThought={data.thought}

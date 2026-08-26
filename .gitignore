@@ -17,6 +17,15 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
+# Local planning and release artifacts
+/CODE-REVIEW*.md
+/TASK-M-*.md
+/TASK-STATUS.md
+/WORKFLOW-STATE.md
+/上线checkList*.md
+/tasks-v*/
+/archive/tasks-v*/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

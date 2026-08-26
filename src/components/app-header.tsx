@@ -1,9 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import { useRef } from 'react'
+import { useActionState, useRef } from 'react'
 import type { MouseEvent } from 'react'
+import { updateNickname, type NicknameActionState } from '@/app/account/actions'
 import { logout } from '@/app/auth/actions'
+import type { AccountProfile } from '@/src/lib/auth/account-profile'
 import { useDismissibleLayer, useOverlayController } from './overlay-provider'
 import { useWorkspaceSidebar } from './workspace-sidebar-provider'
 
@@ -32,13 +34,26 @@ function SidebarIcon({ direction }: { direction: 'collapse' | 'expand' }) {
   )
 }
 
-export function AppHeader() {
+export function AppHeader({ account }: { account?: AccountProfile }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const collapseRef = useRef<HTMLButtonElement>(null)
   const expandRef = useRef<HTMLButtonElement>(null)
   const overlay = useOverlayController()
   const sidebar = useWorkspaceSidebar()
   const menuOpen = overlay.isOpen('account')
+  const initialNicknameState: NicknameActionState = {
+    status: 'idle',
+    message: '',
+    nickname: account?.nickname ?? null,
+  }
+  const [nicknameState, nicknameAction, nicknamePending] = useActionState(
+    updateNickname,
+    initialNicknameState,
+  )
+  const currentNickname = nicknameState.status === 'idle'
+    ? account?.nickname ?? null
+    : nicknameState.nickname
+  const accountLabel = currentNickname || account?.email || '账号'
   useDismissibleLayer('account', menuRef)
 
   function collapseSidebar(event: MouseEvent<HTMLButtonElement>) {
@@ -95,14 +110,47 @@ export function AppHeader() {
         <button
           type="button"
           aria-expanded={menuOpen}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
+          aria-label={`账户：${accountLabel}`}
+          title={accountLabel}
           onClick={(event) => menuOpen
             ? overlay.close('account')
             : overlay.open('account', event.currentTarget)}
-        >账号</button>
-        {menuOpen && <div className="account-menu__panel" role="menu">
+        >{accountLabel}</button>
+        {menuOpen && <div className="account-menu__panel" role="dialog" aria-label="账户设置">
+          <div className="account-menu__identity">
+            <span>当前账号</span>
+            <strong className="account-menu__email">{account?.email ?? '未提供邮箱'}</strong>
+          </div>
+          <form action={nicknameAction} className="account-menu__nickname-form">
+            <label htmlFor="account-nickname">昵称</label>
+            <div className="account-menu__nickname-row">
+              <input
+                key={currentNickname ?? ''}
+                id="account-nickname"
+                className="account-menu__input"
+                name="nickname"
+                type="text"
+                autoComplete="nickname"
+                defaultValue={currentNickname ?? ''}
+                placeholder="怎么称呼你"
+                aria-describedby="account-nickname-help"
+              />
+              <button type="submit" disabled={nicknamePending} aria-busy={nicknamePending}>
+                {nicknamePending ? '保存中' : '保存'}
+              </button>
+            </div>
+            <p id="account-nickname-help" className="account-menu__hint">最多24个字符，留空即清除。</p>
+            {nicknameState.message ? (
+              <p
+                id="account-nickname-feedback"
+                className={`account-menu__feedback account-menu__feedback--${nicknameState.status}`}
+                role={nicknameState.status === 'error' ? 'alert' : 'status'}
+              >{nicknameState.message}</p>
+            ) : null}
+          </form>
           <form action={logout}>
-            <button type="submit" role="menuitem">退出登录</button>
+            <button type="submit">退出登录</button>
           </form>
         </div>}
       </div>

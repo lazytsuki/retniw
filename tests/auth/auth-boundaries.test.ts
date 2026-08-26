@@ -8,16 +8,54 @@ const user = { id: 'owner-id', email: 'owner@example.com' } as User
 describe('requireUser', () => {
   it('returns the authenticated user', async () => {
     const client: AuthClient = {
-      auth: { getClaims: vi.fn().mockResolvedValue({ data: { claims: { sub: user.id } }, error: null }) },
+      auth: {
+        getClaims: vi.fn().mockResolvedValue({
+          data: {
+            claims: {
+              sub: user.id,
+              email: user.email,
+              user_metadata: { nickname: '  Winter  ' },
+            },
+          },
+          error: null,
+        }),
+      },
     }
 
-    await expect(requireUser(client)).resolves.toEqual({ id: user.id })
+    await expect(requireUser(client)).resolves.toEqual({
+      id: user.id,
+      email: user.email,
+      nickname: 'Winter',
+    })
     expect(client.auth.getClaims).toHaveBeenCalledOnce()
+  })
+
+  it('ignores invalid optional profile claims without weakening authentication', async () => {
+    const client: AuthClient = {
+      auth: {
+        getClaims: vi.fn().mockResolvedValue({
+          data: {
+            claims: {
+              sub: user.id,
+              email: 42,
+              user_metadata: { nickname: `Winter\nAdmin` },
+            },
+          },
+          error: null,
+        }),
+      },
+    }
+
+    await expect(requireUser(client)).resolves.toEqual({
+      id: user.id,
+      email: null,
+      nickname: null,
+    })
   })
 
   it('maps a missing session to 401', async () => {
     const client: AuthClient = {
-      auth: { getClaims: vi.fn().mockResolvedValue({ data: { claims: null }, error: null }) },
+      auth: { getClaims: vi.fn().mockResolvedValue({ data: null, error: null }) },
     }
 
     await expect(requireUser(client)).rejects.toMatchObject({

@@ -53,7 +53,7 @@ describe('auth credential validation', () => {
     expect(submitButton).toContain("import { useFormStatus } from 'react-dom'")
     expect(submitButton).toContain('disabled={pending}')
     expect(submitButton).toContain('aria-busy={pending}')
-    expect(submitButton).toContain("isSignup ? '正在创建' : '正在登录'")
+    expect(submitButton).toContain("isSignup ? '正在创建并进入' : '正在登录'")
     const css = await readFile('src/index.css', 'utf8')
     expect(css).toMatch(/\.login-form button:disabled \{[\s\S]*?opacity: 0\.64;[\s\S]*?cursor: default;/)
   })

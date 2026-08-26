@@ -14,13 +14,14 @@ import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
 export const dynamic = 'force-dynamic'
 
 export default async function ReviewPage() {
-  let userId = ''
+  let user: Awaited<ReturnType<typeof requireUser>>
   try {
-    userId = (await requireUser()).id
+    user = await requireUser()
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect('/login')
     throw error
   }
+  const userId = user.id
 
   const client = createServiceClient()
   const thoughts = new ThoughtRepository(client)
@@ -46,7 +47,7 @@ export default async function ReviewPage() {
 
   return (
     <main className="app-shell">
-      <AppHeader />
+      <AppHeader account={{ email: user.email, nickname: user.nickname }} />
       <ThoughtLayout>
         <ThoughtNavigation
           activeThoughtId=""
