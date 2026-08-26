@@ -1,7 +1,7 @@
 # WORKFLOW-STATE
 
-- current_stage: released_v24
-- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充；2026-08-22关于公开自注册替代人工建号和发密码的确认；2026-08-24关于永久删除、归档区重构、跨想法主动复盘与串联，以及‘先记录 后表达’真实内测反馈的补充"
+- current_stage: released_v24_increment
+- source_inputs: "用户在当前任务中提供的 retniw Project Context，以及2026-08-19关于连续思考、开放导入导出、非chatbot定位和系统级交互的反馈；2026-08-21首轮朋友内测关于话题切换、产品定位感知和大陆网络可达性的反馈；2026-08-21现网侧栏裁切、点击响应和产品文案反馈；2026-08-21关于浮层互斥关闭、想法归档删除、点击响应和长想法落脚点的反馈；2026-08-21关于归档与移入上层分类两种语义、单层合集和克制文案的补充；2026-08-22关于公开自注册替代人工建号和发密码的确认；2026-08-24关于永久删除、归档区重构、跨想法主动复盘与串联，以及‘先记录 后表达’真实内测反馈的补充；2026-08-26关于归档与回看固定在侧栏底部、桌面侧栏可收起、移动端写作画布交互、输入区域可见性和主动串联已有想法的反馈"
 - main_artifacts:
   - REQUIREMENT-ANALYSIS.md
   - PRD.md
@@ -154,6 +154,13 @@
   - "V2.4发布后响应收口本地门禁通过：25个测试文件、147项测试、typecheck、lint、Next.js 16.3.1生产build、npm audit高危门禁和git diff --check全部通过；本地生产构建在1280与375像素公开注册页无横向溢出，console error为0"
   - "V2.4发布后响应收口已上线：文档提交29a9605b8ba401d81bc5bd5bce8ebe7bb7e33db3对应production deployment dpl_27JXLhWya1emYsfC4MuomrPV2pX3，Vercel实时读回状态READY、source SHA一致，别名包含retniw.cn和retniw.vercel.app"
   - "V2.4发布后正式域名公开入口复验通过：Chromium在1440与375像素可进入登录和公开注册，无横向溢出和console error；本轮登录与注册切换RSC采样545至651毫秒；/api/review未登录返回401，旧地址返回308并最终进入retniw.cn/login。本轮未重新使用账号回放登录后数据主链，不替代此前V2.4生产双账号与完整闭环证据"
+  - "2026-08-26交互增量完成：桌面侧栏统一支持展开与收起，收起后保留logo、写新想法、归档、回看的SVG入口；归档与回看固定在侧栏底部，历史列表只滚动中间区域；移动端沿用同一导航和数据逻辑并保持写作画布优先"
+  - "2026-08-26输入与串联增量完成：初始输入和继续写使用可见边界、底色、标签及聚焦态；当前想法可直接进入回看，回看默认关闭，开启后可主动扫描最多20条最近想法的开头片段并最多产生3条待判断候选"
+  - "主动串联依赖收口：不新增npm依赖、环境变量或数据库迁移；显式扫描复用ReviewService、DeepSeek和thought_connections唯一关系真相源，既有关系查询限定在本次最多20条候选内且覆盖全部决定状态"
+  - "2026-08-26增量本地门禁通过：25个测试文件、161项测试、typecheck、lint、Next.js 16.3.1生产build、npm audit高危门禁和git diff --check全部通过；真实临时账号脚本覆盖scan未登录401、偏好开启、单想法内容不足、唯一约束、一次性判断、跨账号隔离与清理"
+  - "2026-08-26增量代码已发布：功能提交656cd7cef7fd9ae8503dbcedd49c02ce846706d5，关系查询收口提交920ca22e5fcb63e5fe0d18ce863cc350f691a418；production deployment dpl_DLSPxnJHakWVLaCerNrq3MLWbyMs为READY，Vercel source SHA与920ca22一致，别名包含retniw.cn和retniw.vercel.app"
+  - "2026-08-26正式入口读回：retniw.cn根页307到/login、/login返回200、POST /api/review/scan未登录返回401、retniw.vercel.app返回308到retniw.cn；1280x720与390x844登录页无横向溢出且浏览器error日志为空，近15分钟Vercel生产error日志为空"
+  - "本轮未用现有真实账号点击开始串联，避免未经单独验收把私人历史片段发给DeepSeek或新增待判断联系；登录后的真实主动串联由用户在正式域名验收，不以本轮只读回放替代"
 - prd_template_source:
   title: "【PRD】基础产品需求文档"
   page_id: "72xNrWDr3E1KMOymaOLx"
@@ -167,9 +174,9 @@
 - implementation_target: "/Users/liyingliang.7/retniw"
 - prototype_reuse: reference-only
 - open_questions_in_dialogue: ""
-- suggested_next_action: "进入真实用户验证：观察首次用户能否不经说明走通记录、回看和保留联系，并持续记录真实触摸手势、三网访问、模型候选质量与数据规模增长后的精确计数成本"
+- suggested_next_action: "由用户在正式域名验收侧栏、移动写作画布和真实账号主动串联；之后继续观察首次用户理解、真实触摸手势、三网访问、模型候选质量与数据规模增长后的精确计数成本"
 - joyspace_sync_status: "not_requested"
 - awaiting_user_confirmation: false
-- last_confirmed_stage: released_v24
+- last_confirmed_stage: released_v24_increment
 - confirmation_gate: ""
-- release_checklist: completed_v24
+- release_checklist: completed_v24_increment

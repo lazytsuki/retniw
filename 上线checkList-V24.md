@@ -157,3 +157,28 @@
 - pending 首屏只在需要时请求 exact count，规模放大后的成本进入持续观察。
 - 关闭回看与保存请求先后接近时继续以 entry claim 条件为准，生产观察不改变当前契约。
 - 移动端原文锚点与亮蓝焦点热修已随最新 source SHA 上线。
+
+## 2026-08-26 交互与主动串联增量发布
+
+### 依赖与范围
+
+- [x] 未新增 npm 依赖，`package.json`与`package-lock.json`无变化；`npm ci --dry-run --ignore-scripts`可按现有锁安装。
+- [x] 未新增环境变量或数据库迁移；复用现有 Supabase、DeepSeek、`user_review_preferences`与`thought_connections`。
+- [x] 旧`/api/thoughts/:id/relations/check`不再被运行时代码或真实验收脚本调用；显式扫描统一走`POST /api/review/scan`。
+- [x] 已有关系排除只读取本次最多20条候选内部的关系对，仍覆盖 pending、confirmed、rejected，不受账号全量关系增长和PostgREST默认行上限影响。
+
+### 本地门禁
+
+- [x] 25个测试文件、161项测试通过。
+- [x] TypeScript、ESLint、Next.js 16.3.1生产构建、`npm audit --audit-level=high`与`git diff --check`通过；构建包含`/api/review/scan`。
+- [x] 临时真实账号脚本通过：未登录扫描401、偏好开启、单条想法返回内容不足、关系唯一约束、一次性判断、跨账号404和级联清理。
+- [x] 本地浏览器覆盖320、390、620、900、901、1440像素；输入区、移动导航、桌面侧栏收起/展开和主动串联入口无横向溢出或console error。
+
+### 提交、部署与正式入口
+
+- [x] 功能提交：`656cd7cef7fd9ae8503dbcedd49c02ce846706d5`。
+- [x] 关系查询收口提交：`920ca22e5fcb63e5fe0d18ce863cc350f691a418`。
+- [x] Vercel生产部署：`dpl_DLSPxnJHakWVLaCerNrq3MLWbyMs`，状态READY，source SHA与`920ca22`一致，别名包含`retniw.cn`和`retniw.vercel.app`。
+- [x] `retniw.cn`根页307到`/login`，登录页200，`POST /api/review/scan`未登录401；`retniw.vercel.app`返回308到`retniw.cn`。
+- [x] 正式登录页在1280×720与390×844无横向溢出，浏览器error日志和近15分钟Vercel生产error日志为空。
+- [ ] 未用现有真实账号点击“开始串联”，避免未经单独验收把私人历史片段发给DeepSeek或产生待判断联系；由用户在正式域名完成这一项验收。
