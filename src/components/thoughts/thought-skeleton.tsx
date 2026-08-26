@@ -1,11 +1,13 @@
+import { ThoughtLayout } from './thought-layout'
+
 type ThoughtSkeletonProps = {
   label?: string
 }
 
 export function ThoughtSkeleton({ label = '正在打开内容' }: ThoughtSkeletonProps = {}) {
   return (
-    <div className="thought-layout thought-skeleton" role="status" aria-busy="true" aria-label={label}>
-      <aside className="thought-sidebar">
+    <ThoughtLayout className="thought-skeleton">
+      <aside className="thought-sidebar" id="thought-sidebar" role="status" aria-busy="true" aria-label={label}>
         <div className="skeleton-card" />
         <div className="skeleton-card" />
         <div className="skeleton-line skeleton-line--short" />
@@ -18,6 +20,6 @@ export function ThoughtSkeleton({ label = '正在打开内容' }: ThoughtSkeleto
         <div className="skeleton-line skeleton-line--medium" />
         <div className="skeleton-composer" />
       </section>
-    </div>
+    </ThoughtLayout>
   )
 }

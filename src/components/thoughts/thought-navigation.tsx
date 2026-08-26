@@ -9,6 +9,7 @@ import type { ThoughtCollection } from '@/src/server/repositories/collection-rep
 import { ThoughtListItem } from './thought-list-item'
 import type { ThoughtAction } from './thought-action-menu'
 import { useOverlayController } from '@/src/components/overlay-provider'
+import { useWorkspaceSidebar } from '@/src/components/workspace-sidebar-provider'
 
 type ThoughtNavigationProps = {
   activeThoughtId: string
@@ -60,6 +61,30 @@ function viewTitle(view: View) {
   return '以前的想法'
 }
 
+function NewThoughtIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v8M8 12h8" /></svg>
+}
+
+function ThoughtListIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14M5 12h14M5 16.5h9" /></svg>
+}
+
+function CloseIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+}
+
+function ArchiveIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v4H3zM9 12h6" /></svg>
+}
+
+function ReviewIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="8" r="2.5" /><circle cx="18" cy="16" r="2.5" /><path d="M8.4 9.2 15.6 14.8" /></svg>
+}
+
+function ChevronIcon() {
+  return <svg className="thought-navigation__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+}
+
 export function ThoughtNavigation({
   activeThoughtId,
   activeView,
@@ -70,6 +95,9 @@ export function ThoughtNavigation({
 }: ThoughtNavigationProps) {
   const router = useRouter()
   const overlay = useOverlayController()
+  const closeOverlay = overlay.close
+  const sidebar = useWorkspaceSidebar()
+  const expandedArchiveRef = useRef<HTMLButtonElement>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const deleteOpen = overlay.isOpen('delete-confirm')
   const collectionDeleteOpen = overlay.isOpen('collection-delete-confirm')
@@ -114,20 +142,34 @@ export function ThoughtNavigation({
   }, [historyOpen])
 
   useEffect(() => {
-    const openAfterCheckpoint = () => setHistoryOpen(true)
+    const mobileQuery = window.matchMedia('(max-width: 900px)')
+    const openAfterCheckpoint = () => {
+      if (mobileQuery.matches) setHistoryOpen(true)
+    }
+    const closeOnDesktop = () => {
+      if (mobileQuery.matches) return
+      closeOverlay()
+      historyTriggerRef.current = null
+      setHistoryOpen(false)
+    }
     window.addEventListener(openHistoryAfterCheckpointEvent, openAfterCheckpoint)
+    window.addEventListener('resize', closeOnDesktop)
+    mobileQuery.addEventListener('change', closeOnDesktop)
+    closeOnDesktop()
     try {
       if (sessionStorage.getItem(openHistoryAfterCheckpointKey) === '1') {
         sessionStorage.removeItem(openHistoryAfterCheckpointKey)
-        if (window.matchMedia('(max-width: 900px)').matches) {
-          queueMicrotask(openAfterCheckpoint)
-        }
+        queueMicrotask(openAfterCheckpoint)
       }
     } catch {
       // The desktop sidebar remains available without browser storage.
     }
-    return () => window.removeEventListener(openHistoryAfterCheckpointEvent, openAfterCheckpoint)
-  }, [])
+    return () => {
+      window.removeEventListener(openHistoryAfterCheckpointEvent, openAfterCheckpoint)
+      window.removeEventListener('resize', closeOnDesktop)
+      mobileQuery.removeEventListener('change', closeOnDesktop)
+    }
+  }, [closeOverlay])
 
   useEffect(() => {
     const dialog = deleteDialogRef.current
@@ -183,11 +225,14 @@ export function ThoughtNavigation({
   function closeHistory() {
     if (overlay.activeId?.includes(':history:')) overlay.close()
     setHistoryOpen(false)
-    queueMicrotask(() => historyTriggerRef.current?.isConnected && historyTriggerRef.current.focus())
+    queueMicrotask(() => {
+      const trigger = historyTriggerRef.current
+      if (trigger?.isConnected && trigger.getClientRects().length > 0) trigger.focus()
+    })
   }
 
   function openNewThought(event: MouseEvent<HTMLAnchorElement>) {
-    if (!currentStarted) {
+    if (!currentStarted && activeView !== 'review') {
       event.preventDefault()
       overlay.close()
       document.querySelector<HTMLTextAreaElement>('.thought-composer textarea')?.focus()
@@ -413,6 +458,44 @@ export function ThoughtNavigation({
     return payload.data.collection
   }
 
+  function openArchive(compact: boolean) {
+    if (compact) {
+      sidebar.expand()
+      window.requestAnimationFrame(() => expandedArchiveRef.current?.focus())
+    }
+    void loadView({ kind: 'archived' })
+  }
+
+  function secondaryNavigation(menuScope: 'sidebar' | 'history', compact = false) {
+    return (
+      <div className={`thought-navigation__secondary thought-navigation__footer${compact ? ' thought-navigation__footer--compact' : ''}`}>
+        <button
+          ref={menuScope === 'sidebar' && !compact ? expandedArchiveRef : undefined}
+          type="button"
+          aria-current={view.kind === 'archived' ? 'page' : undefined}
+          aria-label="归档"
+          data-sidebar-tooltip={compact ? '归档' : undefined}
+          onClick={() => openArchive(compact)}
+        >
+          <ArchiveIcon />
+          <span>归档</span>
+          <ChevronIcon />
+        </button>
+        <Link
+          aria-current={activeView === 'review' ? 'page' : undefined}
+          aria-label="回看"
+          data-sidebar-tooltip={compact ? '回看' : undefined}
+          href="/review"
+          onClick={() => menuScope === 'history' && closeHistory()}
+        >
+          <ReviewIcon />
+          <span>回看</span>
+          <ChevronIcon />
+        </Link>
+      </div>
+    )
+  }
+
   function navigationContent(menuScope: 'sidebar' | 'history') {
     const list = loading && visibleThoughts.length === 0
       ? <p className="thought-list-loading" role="status">正在加载</p>
@@ -442,90 +525,105 @@ export function ThoughtNavigation({
           ))}
         </div>
 
-    return <>
-      {(menuScope === 'sidebar' || view.kind !== 'recent') && <div className="thought-navigation__heading">
-        {view.kind !== 'recent' && <button type="button" aria-label="返回以前的想法" onClick={showRecent}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg>
-        </button>}
-        <h2>{viewTitle(view)}</h2>
-      </div>}
-      {list}
-      {loadError && <p className="thought-list-error" role="status">{loadError}</p>}
-      {nextCursor && <button className="load-more-thoughts" type="button" disabled={loading} onClick={() => void loadMore()}>{loading ? '正在加载' : '加载更多'}</button>}
-      {view.kind === 'recent' && <div className="thought-navigation__sections">
-        {collections.length > 0 && <section>
-          <h3>合集</h3>
-          {collections.map((collection) => (
-            <div className="collection-link" key={collection.id}>
-              <button type="button" onClick={() => void loadView({ kind: 'collection', id: collection.id, name: collection.name })}>{collection.name}</button>
-              <button
-                className="collection-delete-action"
-                type="button"
-                aria-label={`删除合集 ${collection.name}`}
-                onClick={(event) => requestCollectionDelete(collection, event.currentTarget)}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
-              </button>
-            </div>
-          ))}
-        </section>}
-        <div className="thought-navigation__secondary">
-          <button type="button" onClick={() => void loadView({ kind: 'archived' })}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v4H3zM9 12h6" /></svg>
-            <span>归档</span>
-            <svg className="thought-navigation__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-          </button>
-          <Link
-            aria-current={activeView === 'review' ? 'page' : undefined}
-            href="/review"
-            onClick={() => menuScope === 'history' && closeHistory()}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="8" r="2.5" /><circle cx="18" cy="16" r="2.5" /><path d="M8.4 9.2 15.6 14.8" /></svg>
-            <span>回看</span>
-            <svg className="thought-navigation__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-          </Link>
-        </div>
-      </div>}
-    </>
+    return <div className="thought-navigation__content">
+      <div className="thought-navigation__scroll">
+        {menuScope === 'sidebar' && <div className="thought-navigation__heading">
+          {view.kind !== 'recent' && <button type="button" aria-label="返回以前的想法" onClick={showRecent}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg>
+          </button>}
+          <h2>{viewTitle(view)}</h2>
+        </div>}
+        {list}
+        {loadError && <p className="thought-list-error" role="status">{loadError}</p>}
+        {nextCursor && <button className="load-more-thoughts" type="button" disabled={loading} onClick={() => void loadMore()}>{loading ? '正在加载' : '加载更多'}</button>}
+        {view.kind === 'recent' && collections.length > 0 && <div className="thought-navigation__sections">
+          <section>
+            <h3>合集</h3>
+            {collections.map((collection) => (
+              <div className="collection-link" key={collection.id}>
+                <button type="button" onClick={() => void loadView({ kind: 'collection', id: collection.id, name: collection.name })}>{collection.name}</button>
+                <button
+                  className="collection-delete-action"
+                  type="button"
+                  aria-label={`删除合集 ${collection.name}`}
+                  onClick={(event) => requestCollectionDelete(collection, event.currentTarget)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
+                </button>
+              </div>
+            ))}
+          </section>
+        </div>}
+      </div>
+      {secondaryNavigation(menuScope)}
+    </div>
   }
 
   return (
     <>
-      <aside className="thought-sidebar" aria-label="想法导航">
-        <Link aria-current={!currentStarted ? 'page' : undefined} aria-busy={navigatingNew || undefined} className="new-thought-action" href="/" onClick={openNewThought}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v8M8 12h8" /></svg>
+      <aside className="thought-sidebar" id="thought-sidebar" aria-label="想法导航" data-collapsed={sidebar.collapsed || undefined}>
+        <Link
+          aria-current={!currentStarted ? 'page' : undefined}
+          aria-busy={navigatingNew || undefined}
+          aria-label="写新想法"
+          className="new-thought-action"
+          data-sidebar-tooltip={sidebar.collapsed ? '写新想法' : undefined}
+          href="/"
+          onClick={openNewThought}
+        >
+          <NewThoughtIcon />
           <span><strong>{navigatingNew ? '正在打开' : '写新想法'}</strong></span>
         </Link>
-        <section className="all-thoughts">{navigationContent('sidebar')}</section>
+        {sidebar.collapsed
+          ? <section className="all-thoughts all-thoughts--collapsed">{secondaryNavigation('sidebar', true)}</section>
+          : <section className="all-thoughts">{navigationContent('sidebar')}</section>}
       </aside>
 
-      <nav className="mobile-workspace-nav" aria-label="想法导航">
-        <Link aria-current={!currentStarted ? 'page' : undefined} aria-busy={navigatingNew || undefined} href="/" onClick={openNewThought}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v8M8 12h8" /></svg>
-          <span>{navigatingNew ? '正在打开' : '写新想法'}</span>
-        </Link>
+      <nav className="mobile-workspace-toolbar" aria-label="想法导航">
         <button
           ref={historyTriggerRef}
+          className="mobile-history-action"
           type="button"
-          aria-current={activeView === 'review' ? 'page' : undefined}
+          aria-controls="thought-history-dialog"
           aria-expanded={historyOpen}
+          aria-haspopup="dialog"
           onClick={(event) => historyOpen ? closeHistory() : openHistory(event.currentTarget)}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7.5h12M6 12h12M6 16.5h8" /></svg>
+          <ThoughtListIcon />
           <span>以前的想法</span>
         </button>
+        {(currentStarted || activeView === 'review') && <Link
+          aria-busy={navigatingNew || undefined}
+          aria-label={navigatingNew ? '正在打开新想法' : '写新想法'}
+          className="mobile-new-thought-action"
+          href="/"
+          onClick={openNewThought}
+        >
+          <NewThoughtIcon />
+          <span>{navigatingNew ? '正在打开' : '写新想法'}</span>
+        </Link>}
       </nav>
 
       <dialog
+        id="thought-history-dialog"
         className="thought-history-dialog"
         ref={dialogRef}
+        aria-labelledby="thought-history-title"
         onClick={(event) => {
           if (event.target === event.currentTarget) closeHistory()
         }}
         onCancel={(event) => { event.preventDefault(); closeHistory() }}
         onClose={() => historyOpen && closeHistory()}
       >
-        <div className="thought-history-dialog__header"><h2>以前的想法</h2><button type="button" onClick={closeHistory}>关闭</button></div>
+        <div className="thought-history-dialog__header">
+          {view.kind !== 'recent' && <button className="thought-history-dialog__back" type="button" aria-label="返回以前的想法" onClick={showRecent}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg>
+          </button>}
+          <h2 id="thought-history-title">{viewTitle(view)}</h2>
+          <button className="thought-history-dialog__close" type="button" aria-label="关闭以前的想法" onClick={closeHistory}>
+            <CloseIcon />
+          </button>
+        </div>
         <div className="thought-history-dialog__body">{navigationContent('history')}</div>
         <div id="thought-history-layer-root" />
       </dialog>

@@ -18,6 +18,10 @@ function dependencies() {
     get: vi.fn().mockResolvedValue({ enabled: true, updatedAt: processedThrough }),
   }
   const thoughts = {
+    listReviewCorpus: vi.fn().mockResolvedValue([
+      { id: ids.firstTarget, summary: '旧摘要一' },
+      { id: ids.secondTarget, summary: '旧摘要二' },
+    ]),
     listReviewCandidates: vi.fn().mockResolvedValue([
       { id: ids.firstTarget, summary: '旧摘要一' },
       { id: ids.secondTarget, summary: '旧摘要二' },
@@ -40,10 +44,18 @@ function dependencies() {
     })),
   }
   const connections = {
+    listExistingPairs: vi.fn().mockResolvedValue([]),
     listExistingTargets: vi.fn().mockResolvedValue(new Set<string>()),
     createCandidate: vi.fn().mockResolvedValue({ connection: {}, created: true }),
   }
   const provider = {
+    findConnectionPairs: vi.fn().mockResolvedValue([
+      {
+        sourceThoughtId: ids.firstTarget,
+        targetThoughtId: ids.secondTarget,
+        rationale: '两条旧想法都在处理同一个取舍',
+      },
+    ]),
     findConnections: vi.fn().mockResolvedValue([
       { targetThoughtId: ids.firstTarget, rationale: '两段内容都在追问同一件事' },
       { targetThoughtId: ids.secondTarget, rationale: '前后的取舍可以放在一起看' },
@@ -144,5 +156,95 @@ describe('ReviewService', () => {
     expect(deps.connections.createCandidate).not.toHaveBeenCalled()
     expect(deps.log).toHaveBeenCalledWith('provider_failed', 'UNKNOWN')
     expect(JSON.stringify(deps.log.mock.calls)).not.toContain('私密正文')
+  })
+
+  it('keeps an explicit history scan behind the same preference boundary', async () => {
+    const deps = dependencies()
+    deps.preferences.get.mockResolvedValue({ enabled: false, updatedAt: null })
+
+    await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
+      status: 'disabled',
+      created: 0,
+    })
+
+    expect(deps.thoughts.listReviewCorpus).not.toHaveBeenCalled()
+    expect(deps.connections.listExistingPairs).not.toHaveBeenCalled()
+    expect(deps.provider.findConnectionPairs).not.toHaveBeenCalled()
+  })
+
+  it('requires at least two existing thoughts before calling the provider', async () => {
+    const deps = dependencies()
+    deps.thoughts.listReviewCorpus.mockResolvedValue([
+      { id: ids.firstTarget, summary: '只有一条' },
+    ])
+
+    await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
+      status: 'not-enough-content',
+      created: 0,
+    })
+
+    expect(deps.connections.listExistingPairs).not.toHaveBeenCalled()
+    expect(deps.provider.findConnectionPairs).not.toHaveBeenCalled()
+  })
+
+  it('scans bounded history on demand and stores only anchored pending candidates', async () => {
+    const deps = dependencies()
+    const corpus = [
+      { id: ids.firstTarget, summary: '旧摘要一' },
+      { id: ids.secondTarget, summary: '旧摘要二' },
+    ]
+    const existingPairs = [{
+      sourceThoughtId: ids.thought,
+      targetThoughtId: ids.firstTarget,
+    }]
+    deps.thoughts.listReviewCorpus.mockResolvedValue(corpus)
+    deps.connections.listExistingPairs.mockResolvedValue(existingPairs)
+
+    await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
+      status: 'processed',
+      created: 1,
+    })
+
+    expect(deps.thoughts.listReviewCorpus).toHaveBeenCalledWith(ids.user)
+    expect(deps.connections.listExistingPairs).toHaveBeenCalledWith(ids.user)
+    expect(deps.provider.findConnectionPairs).toHaveBeenCalledWith(corpus, existingPairs)
+    expect(deps.entries.firstUserEntry).toHaveBeenCalledWith(ids.user, ids.firstTarget)
+    expect(deps.entries.firstUserEntry).toHaveBeenCalledWith(ids.user, ids.secondTarget)
+    expect(deps.connections.createCandidate).toHaveBeenCalledWith({
+      userId: ids.user,
+      currentThoughtId: ids.firstTarget,
+      targetThoughtId: ids.secondTarget,
+      currentEntryId: ids.firstTargetEntry,
+      targetEntryId: ids.secondTargetEntry,
+      rationale: '两条旧想法都在处理同一个取舍',
+    })
+    expect(deps.entries.claimForReview).not.toHaveBeenCalled()
+  })
+
+  it('keeps an explicit provider failure retryable without logging history text', async () => {
+    const deps = dependencies()
+    deps.provider.findConnectionPairs.mockRejectedValue(new Error('供应商返回了：旧的私密内容'))
+
+    await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
+      status: 'provider-failed',
+      created: 0,
+    })
+
+    expect(deps.connections.createCandidate).not.toHaveBeenCalled()
+    expect(deps.entries.claimForReview).not.toHaveBeenCalled()
+    expect(deps.log).toHaveBeenCalledWith('provider_failed', 'UNKNOWN')
+    expect(JSON.stringify(deps.log.mock.calls)).not.toContain('私密内容')
+  })
+
+  it('reports an explicit candidate persistence failure instead of saying no connection was found', async () => {
+    const deps = dependencies()
+    deps.connections.createCandidate.mockRejectedValue(new Error('write failed'))
+
+    await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
+      status: 'persistence-failed',
+      created: 0,
+    })
+
+    expect(deps.log).toHaveBeenCalledWith('candidate_save_failed', 'UNKNOWN')
   })
 })

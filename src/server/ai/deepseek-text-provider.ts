@@ -24,6 +24,19 @@ export type ReviewSuggestion = {
   rationale: string
 }
 
+export type ExistingReviewPair = {
+  sourceThoughtId: string
+  targetThoughtId: string
+}
+
+export type ReviewPairSuggestion = ExistingReviewPair & {
+  rationale: string
+}
+
+function reviewPairKey(firstThoughtId: string, secondThoughtId: string) {
+  return [firstThoughtId, secondThoughtId].sort().join(':')
+}
+
 export class DeepSeekTextProvider {
   constructor(
     private readonly apiKey = process.env.DEEPSEEK_API_KEY,
@@ -275,6 +288,89 @@ export class DeepSeekTextProvider {
       }
       seenIds.add(targetThoughtId)
       suggestions.push({ targetThoughtId, rationale })
+    }
+
+    return suggestions
+  }
+
+  async findConnectionPairs(
+    candidates: ReviewCandidateSummary[],
+    existingPairs: ExistingReviewPair[],
+  ): Promise<ReviewPairSuggestion[]> {
+    const boundedCandidates = candidates.slice(0, 20).map((candidate) => ({
+      id: candidate.id,
+      summary: candidate.summary.slice(0, 500),
+    }))
+    if (boundedCandidates.length < 2) return []
+
+    const allowedIds = new Set(boundedCandidates.map((candidate) => candidate.id))
+    const boundedExistingPairs = existingPairs.flatMap((pair) => (
+      allowedIds.has(pair.sourceThoughtId) &&
+      allowedIds.has(pair.targetThoughtId) &&
+      pair.sourceThoughtId !== pair.targetThoughtId
+        ? [{
+            sourceThoughtId: pair.sourceThoughtId,
+            targetThoughtId: pair.targetThoughtId,
+          }]
+        : []
+    ))
+    const excludedKeys = new Set(boundedExistingPairs.map((pair) => (
+      reviewPairKey(pair.sourceThoughtId, pair.targetThoughtId)
+    )))
+
+    const result = await this.complete(
+      '输入只包含用户自己写下或导入的近期想法摘要。找出其中存在明确联系、且不在existingPairs里的想法对，最多返回3条。只返回JSON，严格格式为 {"connections":[{"sourceThoughtId":"候选id","targetThoughtId":"候选id","rationale":"一句不超过300字、讲人话的理由"}]}。没有明确联系时返回空数组。不得返回候选之外的id、自连接、重复想法对或existingPairs，不得补写输入中没有的信息。',
+      { thoughts: boundedCandidates, existingPairs: boundedExistingPairs },
+      45_000,
+    )
+
+    if (
+      typeof result !== 'object' ||
+      result === null ||
+      Array.isArray(result) ||
+      Object.keys(result).length !== 1 ||
+      !Array.isArray((result as { connections?: unknown }).connections)
+    ) {
+      throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+    }
+
+    const connections = (result as { connections: unknown[] }).connections
+    if (connections.length > 3) {
+      throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+    }
+
+    const seenPairs = new Set<string>()
+    const suggestions: ReviewPairSuggestion[] = []
+    for (const connection of connections) {
+      if (
+        typeof connection !== 'object' ||
+        connection === null ||
+        Array.isArray(connection) ||
+        Object.keys(connection).length !== 3
+      ) {
+        throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+      }
+      const sourceThoughtId = (connection as { sourceThoughtId?: unknown }).sourceThoughtId
+      const targetThoughtId = (connection as { targetThoughtId?: unknown }).targetThoughtId
+      const rationaleValue = (connection as { rationale?: unknown }).rationale
+      const rationale = typeof rationaleValue === 'string' ? rationaleValue.trim() : ''
+      if (
+        typeof sourceThoughtId !== 'string' ||
+        typeof targetThoughtId !== 'string' ||
+        !allowedIds.has(sourceThoughtId) ||
+        !allowedIds.has(targetThoughtId) ||
+        sourceThoughtId === targetThoughtId ||
+        !rationale ||
+        rationale.length > 300
+      ) {
+        throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+      }
+      const pairKey = reviewPairKey(sourceThoughtId, targetThoughtId)
+      if (excludedKeys.has(pairKey) || seenPairs.has(pairKey)) {
+        throw new ApiError(503, 'AI_UNAVAILABLE', 'AI service returned an invalid result', true)
+      }
+      seenPairs.add(pairKey)
+      suggestions.push({ sourceThoughtId, targetThoughtId, rationale })
     }
 
     return suggestions

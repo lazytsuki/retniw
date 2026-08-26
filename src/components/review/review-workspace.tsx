@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import styles from './review-workspace.module.css'
 import type { ReviewPreference } from '@/src/server/repositories/review-preference-repository'
 import type { ReviewConnection } from '@/src/server/repositories/thought-connection-repository'
@@ -12,6 +12,13 @@ type ReviewResponse = {
     connections?: ReviewConnection[]
     pendingCount?: number
     nextCursor?: string | null
+  }
+}
+
+type ReviewScanResponse = {
+  data?: {
+    status?: 'disabled' | 'not-enough-content' | 'processed' | 'provider-failed' | 'persistence-failed'
+    created?: number
   }
 }
 
@@ -80,14 +87,14 @@ function ConnectionCard({
       <p className={styles.reason}><ConnectionMark />{connection.rationale}</p>
       <div className={styles.pair}>
         <div>
-          <span>这次写的</span>
+          <span>后来写的</span>
           <p>{connection.source.excerpt}</p>
           <Link href={`/thoughts/${connection.source.thoughtId}#entry-${connection.source.entryId}`}>
             打开原文<ArrowMark />
           </Link>
         </div>
         <div>
-          <span>以前写的</span>
+          <span>更早写的</span>
           <p>{connection.target.excerpt}</p>
           <Link href={`/thoughts/${connection.target.thoughtId}#entry-${connection.target.entryId}`}>
             打开原文<ArrowMark />
@@ -114,8 +121,12 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState<'pending' | 'confirmed' | null>(null)
   const [preferencePending, setPreferencePending] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const [decidingId, setDecidingId] = useState<string | null>(null)
   const [message, setMessage] = useState(initialData ? '' : '没有加载完成，可以重试。')
+  const [notice, setNotice] = useState('')
+  const preferencePendingRef = useRef(false)
+  const scanningRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -142,12 +153,15 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
     }
   }, [])
 
-  async function setEnabled(enabled: boolean) {
-    if (!preference || preferencePending) return
+  async function setEnabled(enabled: boolean, scanAfter = false) {
+    if (!preference || preferencePendingRef.current) return
     const previous = preference
+    let saved = false
+    preferencePendingRef.current = true
     setPreference({ ...preference, enabled })
     setPreferencePending(true)
     setMessage('')
+    setNotice('')
     try {
       const response = await fetch('/api/review/preference', {
         method: 'PATCH',
@@ -157,11 +171,55 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
       const payload = await response.json().catch(() => null) as ReviewResponse | null
       if (!response.ok || !payload?.data?.preference) throw new Error('UPDATE_FAILED')
       setPreference(payload.data.preference)
+      saved = true
     } catch {
       setPreference(previous)
       setMessage('没有保存，可以重试。')
     } finally {
+      preferencePendingRef.current = false
       setPreferencePending(false)
+    }
+    if (saved && enabled && scanAfter) await scanExistingThoughts()
+  }
+
+  async function scanExistingThoughts() {
+    if (scanningRef.current) return
+    scanningRef.current = true
+    setScanning(true)
+    setMessage('')
+    setNotice('')
+    try {
+      const response = await fetch('/api/review/scan', { method: 'POST' })
+      const payload = await response.json().catch(() => null) as ReviewScanResponse | null
+      if (!response.ok || !payload?.data?.status) throw new Error('SCAN_FAILED')
+      if (payload.data.status === 'disabled') {
+        setMessage('先开启回看，再开始串联。')
+        return
+      }
+      if (payload.data.status === 'provider-failed') {
+        setMessage('这次没有完成，可以重试。')
+        return
+      }
+      if (payload.data.status === 'not-enough-content') {
+        setNotice('至少需要两条想法，才能开始串联。')
+        return
+      }
+      const created = payload.data.created ?? 0
+      await load()
+      if (payload.data.status === 'persistence-failed') {
+        setMessage(created > 0
+          ? `只保存了${created}条联系，其余没有保存，可以重试。`
+          : '这次找到的联系没有保存，可以重试。')
+        return
+      }
+      setNotice(created > 0
+        ? `找到了${created}条联系，等你判断。`
+        : '这次没有找到新的明确联系。')
+    } catch {
+      setMessage('这次没有完成，可以重试。')
+    } finally {
+      scanningRef.current = false
+      setScanning(false)
     }
   }
 
@@ -245,18 +303,33 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
         ) : null}
       </header>
 
-      {!preference.enabled ? (
-        <div className={styles.intro}>
-          <ConnectionMark />
-          <h2>看看以前的想法之间有什么联系。</h2>
-          <p>开启后，每次保存新内容，retniw会把这次写下或导入的内容和必要的旧想法交给DeepSeek比较。它只找可能的联系，不改写，也不替你保留。</p>
-          <button type="button" disabled={preferencePending} onClick={() => void setEnabled(true)}>
-            {preferencePending ? '正在开启' : '开启回看'}
-          </button>
-        </div>
-      ) : null}
+      <div className={styles.intro} aria-busy={scanning || undefined}>
+        <ConnectionMark />
+        <h2>串联已有想法</h2>
+        <p>
+          {preference.enabled
+            ? '把最多20条最近想法的开头片段交给DeepSeek，找出最多3条有依据的联系。结果先由你判断，不改写，也不自动保留。'
+            : '开启后，会先把最多20条最近想法的开头片段交给DeepSeek，找出最多3条有依据的联系；以后保存新内容时也会继续找。结果先由你判断，不改写，也不自动保留。'}
+        </p>
+        <button
+          type="button"
+          disabled={preferencePending || scanning}
+          onClick={() => preference.enabled
+            ? void scanExistingThoughts()
+            : void setEnabled(true, true)}
+        >
+          {preferencePending
+            ? '正在开启'
+            : scanning
+              ? '正在串联'
+              : preference.enabled
+                ? '开始串联'
+                : '开启并开始串联'}
+        </button>
+      </div>
 
       {message ? <p className={styles.error} role="alert">{message}</p> : null}
+      {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
 
       {(preference.enabled || hasReviewContent) ? <section className={styles.listSection} aria-labelledby="pending-title">
         <div className={styles.sectionHeading}>
@@ -275,7 +348,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
             ))}
           </div>
         ) : (
-          <p className={styles.empty}>写下新内容后，可能的联系会出现在这里。</p>
+          <p className={styles.empty}>开始串联，或继续写下新内容后，可能的联系会出现在这里。</p>
         )}
         {pending.nextCursor ? (
           <button className={styles.more} type="button" disabled={loadingMore !== null} onClick={() => void loadMore('pending')}>

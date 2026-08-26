@@ -70,6 +70,16 @@ export function ThoughtActionMenu({
   }, [menuOpen])
 
   useLayoutEffect(() => {
+    if (!pickerOpen) return
+    const frame = window.requestAnimationFrame(() => {
+      layerRef.current
+        ?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)')
+        ?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [pickerOpen])
+
+  useLayoutEffect(() => {
     if (!menuOpen && !pickerOpen) return
     const place = () => {
       const layer = layerRef.current
@@ -181,6 +191,7 @@ export function ThoughtActionMenu({
     </div>
   ) : pickerOpen ? (
     <div
+      id={`${pickerId}:panel`}
       aria-busy={moveState === 'pending' || undefined}
       className="collection-picker-layer thought-action-layer__content"
       data-scope={menuScope}
@@ -207,7 +218,7 @@ export function ThoughtActionMenu({
         aria-label="想法操作"
         aria-haspopup="menu"
         aria-expanded={menuOpen || pickerOpen}
-        aria-controls={menuOpen ? `${menuId}:panel` : undefined}
+        aria-controls={menuOpen ? `${menuId}:panel` : pickerOpen ? `${pickerId}:panel` : undefined}
         onClick={(event) => {
           onOpen?.()
           if (menuOpen || pickerOpen) overlay.close()

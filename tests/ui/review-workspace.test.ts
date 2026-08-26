@@ -35,14 +35,25 @@ describe('cross-thought review workspace', () => {
     expect(workspace).not.toContain('queueMicrotask(() => void load())')
   })
 
-  it('keeps cross-thought processing off until the user opts in', async () => {
+  it('keeps cross-thought processing explicit and off until the user opts in', async () => {
     const workspace = await readFile('src/components/review/review-workspace.tsx', 'utf8')
+    const route = await readFile('app/api/review/scan/route.ts', 'utf8')
 
-    expect(workspace).toContain('开启回看')
+    expect(workspace).toContain('串联已有想法')
+    expect(workspace).toContain('开启并开始串联')
+    expect(workspace).toContain('开始串联')
     expect(workspace).toContain('关闭回看')
     expect(workspace).toContain("fetch('/api/review/preference'")
-    expect(workspace).toContain('必要的旧想法交给DeepSeek比较')
-    expect(workspace).toContain('不改写，也不替你保留')
+    expect(workspace).toContain("fetch('/api/review/scan', { method: 'POST' })")
+    expect(workspace).toContain('最多20条最近想法的开头片段')
+    expect(workspace).toContain('最多3条有依据的联系')
+    expect(workspace).toContain('不改写，也不自动保留')
+    expect(workspace).toContain('setEnabled(true, true)')
+    expect(workspace).toContain('if (!preference || preferencePendingRef.current) return')
+    expect(workspace).toContain('if (scanningRef.current) return')
+    expect(workspace).toContain("payload.data.status === 'persistence-failed'")
+    expect(workspace).toContain('这次找到的联系没有保存，可以重试。')
+    expect(route).toContain('.scanExistingThoughts(user.id)')
     expect(workspace).toContain('preference.enabled || hasReviewContent')
     expect(workspace).toContain('pending.items.length > 0 || pendingCount > 0')
     expect(workspace).toContain('pendingData.pendingCount ?? pendingData.connections!.length')
@@ -51,8 +62,8 @@ describe('cross-thought review workspace', () => {
   it('anchors every candidate in two original entries and leaves the decision to the user', async () => {
     const workspace = await readFile('src/components/review/review-workspace.tsx', 'utf8')
 
-    expect(workspace).toContain('这次写的')
-    expect(workspace).toContain('以前写的')
+    expect(workspace).toContain('后来写的')
+    expect(workspace).toContain('更早写的')
     expect(workspace).toContain('#entry-${connection.source.entryId}')
     expect(workspace).toContain('#entry-${connection.target.entryId}')
     expect(workspace).toContain("onDecide('confirmed')")

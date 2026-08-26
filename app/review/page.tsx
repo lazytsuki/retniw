@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { AppHeader } from '@/src/components/app-header'
 import { ReviewWorkspace } from '@/src/components/review/review-workspace'
 import { ThoughtNavigation } from '@/src/components/thoughts/thought-navigation'
+import { ThoughtLayout } from '@/src/components/thoughts/thought-layout'
 import { ApiError } from '@/src/lib/api-error'
 import { requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
@@ -46,7 +47,7 @@ export default async function ReviewPage() {
   return (
     <main className="app-shell">
       <AppHeader />
-      <div className="thought-layout">
+      <ThoughtLayout>
         <ThoughtNavigation
           activeThoughtId=""
           activeView="review"
@@ -58,7 +59,7 @@ export default async function ReviewPage() {
         <section className="thought-main" aria-label="回看以前的想法">
           <ReviewWorkspace initialData={initialReview} />
         </section>
-      </div>
+      </ThoughtLayout>
     </main>
   )
 }

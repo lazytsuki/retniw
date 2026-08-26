@@ -1,8 +1,9 @@
 'use client'
 
-import type { RefObject } from 'react'
+import { useId, type RefObject } from 'react'
 
 type ThoughtComposerProps = {
+  autoFocus?: boolean
   content: string
   hasEntries: boolean
   onChange: (content: string) => void
@@ -11,8 +12,9 @@ type ThoughtComposerProps = {
 }
 
 export function thoughtComposerCopy(hasEntries: boolean) {
-  const text = hasEntries ? '接着写' : '写在这里'
-  return { ariaLabel: text, placeholder: text }
+  return hasEntries
+    ? { ariaLabel: '继续写', placeholder: '补充一个新的点，或继续刚才的思路' }
+    : { ariaLabel: '写在这里', placeholder: '从这里开始写' }
 }
 
 export function shouldSubmitThought(event: {
@@ -20,17 +22,27 @@ export function shouldSubmitThought(event: {
   shiftKey: boolean
   isComposing: boolean
   keyCode: number
-}) {
-  return event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229
+}, coarsePointer = false) {
+  return event.key === 'Enter' &&
+    !event.shiftKey &&
+    !event.isComposing &&
+    event.keyCode !== 229 &&
+    !coarsePointer
 }
 
-export function ThoughtComposer({ content, hasEntries, onChange, onSubmit, textareaRef }: ThoughtComposerProps) {
+export function ThoughtComposer({ autoFocus = false, content, hasEntries, onChange, onSubmit, textareaRef }: ThoughtComposerProps) {
   const copy = thoughtComposerCopy(hasEntries)
+  const textareaId = useId()
   return (
-    <div className="thought-composer capture-surface">
+    <div
+      className={`thought-composer capture-surface${hasEntries ? '' : ' thought-composer--initial'}`}
+      data-mode={hasEntries ? 'continuation' : 'initial'}
+    >
+      {hasEntries && <label className="thought-composer__label" htmlFor={textareaId}>继续写</label>}
       <textarea
+        id={textareaId}
         ref={textareaRef}
-        autoFocus
+        autoFocus={autoFocus}
         maxLength={10_000}
         aria-label={copy.ariaLabel}
         placeholder={copy.placeholder}
@@ -42,13 +54,14 @@ export function ThoughtComposer({ content, hasEntries, onChange, onSubmit, texta
             shiftKey: event.shiftKey,
             isComposing: event.nativeEvent.isComposing,
             keyCode: event.keyCode,
-          })) return
+          }, window.matchMedia('(pointer: coarse)').matches)) return
           event.preventDefault()
           onSubmit()
         }}
       />
       <div className="capture-actions">
-        <span>Enter 保存 · Shift+Enter 换行</span>
+        <span className="capture-shortcut-hint">Enter 保存 · Shift+Enter 换行</span>
+        <span className="capture-mobile-hint">换行继续写，点箭头保存</span>
         <button type="button" aria-label="保存" disabled={!content.trim()} onClick={onSubmit}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m7 12 5-5 5 5M12 7v10" />

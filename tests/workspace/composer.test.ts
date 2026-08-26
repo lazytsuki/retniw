@@ -5,18 +5,24 @@ describe('thought composer keyboard behavior', () => {
   it('uses different copy for a new idea and the current idea', () => {
     expect(thoughtComposerCopy(false)).toEqual({
       ariaLabel: '写在这里',
-      placeholder: '写在这里',
+      placeholder: '从这里开始写',
     })
     expect(thoughtComposerCopy(true)).toEqual({
-      ariaLabel: '接着写',
-      placeholder: '接着写',
+      ariaLabel: '继续写',
+      placeholder: '补充一个新的点，或继续刚才的思路',
     })
   })
 
-  it('submits with Enter', () => {
+  it('submits with Enter for a precise pointer', () => {
     expect(
       shouldSubmitThought({ key: 'Enter', shiftKey: false, isComposing: false, keyCode: 13 }),
     ).toBe(true)
+  })
+
+  it('keeps Return as a newline for coarse-pointer mobile input', () => {
+    expect(
+      shouldSubmitThought({ key: 'Enter', shiftKey: false, isComposing: false, keyCode: 13 }, true),
+    ).toBe(false)
   })
 
   it.each([

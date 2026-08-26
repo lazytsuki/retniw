@@ -172,18 +172,30 @@ export class ThoughtRepository {
     currentThoughtId: string,
     excludedThoughtIds: ReadonlySet<string> = new Set(),
   ): Promise<ReviewCandidate[]> {
+    return this.readReviewCorpus(userId, currentThoughtId, excludedThoughtIds)
+  }
+
+  async listReviewCorpus(userId: string): Promise<ReviewCandidate[]> {
+    return this.readReviewCorpus(userId, null, new Set())
+  }
+
+  private async readReviewCorpus(
+    userId: string,
+    currentThoughtId: string | null,
+    excludedThoughtIds: ReadonlySet<string>,
+  ): Promise<ReviewCandidate[]> {
     const excludedIds = Array.from(excludedThoughtIds).filter((id) => UUID_PATTERN.test(id))
-    const query = this.client
+    let query = this.client
       .from('thoughts')
       .select('id, summary_content')
       .eq('user_id', userId)
       .is('deleted_at', null)
-      .neq('id', currentThoughtId)
       .in('summary_entry_type', ['user', 'import'])
       .not('summary_content', 'is', null)
       .order('last_activity_at', { ascending: false })
       .order('id', { ascending: false })
 
+    if (currentThoughtId) query = query.neq('id', currentThoughtId)
     if (excludedIds.length) query.not('id', 'in', `(${excludedIds.join(',')})`)
 
     const { data, error } = await query.limit(20).returns<Array<{

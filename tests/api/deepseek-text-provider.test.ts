@@ -164,4 +164,83 @@ describe('DeepSeekTextProvider', () => {
         .rejects.toMatchObject({ code: 'AI_UNAVAILABLE', retryable: true })
     }
   })
+
+  it('returns up to three new thought pairs from a bounded history corpus', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response(JSON.stringify({
+      connections: [
+        {
+          sourceThoughtId: 'thought-1',
+          targetThoughtId: 'thought-2',
+          rationale: '两条想法都在处理同一个取舍',
+        },
+        {
+          sourceThoughtId: 'thought-3',
+          targetThoughtId: 'thought-4',
+          rationale: '前后的问题可以放在一起看',
+        },
+      ],
+    })))
+    const provider = new DeepSeekTextProvider('test-key', fetchMock)
+    const candidates = Array.from({ length: 21 }, (_, index) => ({
+      id: `thought-${index + 1}`,
+      summary: '旧'.repeat(600),
+    }))
+    const existingPairs = [
+      { sourceThoughtId: 'thought-5', targetThoughtId: 'thought-6' },
+      { sourceThoughtId: 'thought-1', targetThoughtId: 'outside' },
+    ]
+
+    await expect(provider.findConnectionPairs(candidates, existingPairs)).resolves.toEqual([
+      {
+        sourceThoughtId: 'thought-1',
+        targetThoughtId: 'thought-2',
+        rationale: '两条想法都在处理同一个取舍',
+      },
+      {
+        sourceThoughtId: 'thought-3',
+        targetThoughtId: 'thought-4',
+        rationale: '前后的问题可以放在一起看',
+      },
+    ])
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    const input = JSON.parse(requestBody.messages[1].content)
+    expect(input.thoughts).toHaveLength(20)
+    expect(input.thoughts[0].summary).toHaveLength(500)
+    expect(input.existingPairs).toEqual([
+      { sourceThoughtId: 'thought-5', targetThoughtId: 'thought-6' },
+    ])
+  })
+
+  it('rejects unknown, self, duplicate, existing, overlong or over-limit thought pairs', async () => {
+    const candidates = Array.from({ length: 5 }, (_, index) => ({
+      id: `thought-${index + 1}`,
+      summary: `旧想法${index + 1}`,
+    }))
+    const existingPairs = [{ sourceThoughtId: 'thought-1', targetThoughtId: 'thought-2' }]
+    const pair = (sourceThoughtId: string, targetThoughtId: string, rationale = '有关') => ({
+      sourceThoughtId,
+      targetThoughtId,
+      rationale,
+    })
+    const invalidPayloads = [
+      { connections: [pair('outside', 'thought-2')] },
+      { connections: [pair('thought-1', 'thought-1')] },
+      { connections: [pair('thought-1', 'thought-2')] },
+      { connections: [pair('thought-2', 'thought-3'), pair('thought-3', 'thought-2')] },
+      { connections: [pair('thought-2', 'thought-3', '长'.repeat(301))] },
+      { connections: Array.from({ length: 4 }, (_, index) => (
+        pair('thought-1', `thought-${index + 2}`)
+      )) },
+    ]
+
+    for (const payload of invalidPayloads) {
+      const provider = new DeepSeekTextProvider(
+        'test-key',
+        vi.fn<typeof fetch>().mockResolvedValue(response(JSON.stringify(payload))),
+      )
+      await expect(provider.findConnectionPairs(candidates, existingPairs))
+        .rejects.toMatchObject({ code: 'AI_UNAVAILABLE', retryable: true })
+    }
+  })
 })

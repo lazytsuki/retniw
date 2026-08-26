@@ -21,6 +21,7 @@ import { aiOutputForDisplay } from '@/src/lib/ai-output'
 import { requestHistoryAfterCheckpoint, ThoughtNavigation } from './thought-navigation'
 import { ThoughtMenu } from './thought-menu'
 import { CheckpointDialog } from './checkpoint-dialog'
+import { ThoughtLayout } from './thought-layout'
 import type { ThoughtCheckpoint } from '@/src/server/repositories/checkpoint-repository'
 import type { ThoughtCollection } from '@/src/server/repositories/collection-repository'
 import { useOverlayController } from '@/src/components/overlay-provider'
@@ -315,7 +316,7 @@ export function ThoughtWorkspace({
   ), [checkpoints, entries])
 
   return (
-    <div className="thought-layout">
+    <ThoughtLayout>
       <ThoughtNavigation
         activeThoughtId={thoughtId}
         currentStarted={started}
@@ -382,6 +383,7 @@ export function ThoughtWorkspace({
         )}
         <StreamingAiEntry state={ai.state} onClear={ai.clear} />
         <ThoughtComposer
+          autoFocus={!started}
           content={content}
           hasEntries={entries.length > 0}
           onChange={handleChange}
@@ -415,6 +417,6 @@ export function ThoughtWorkspace({
         />
         <CheckpointDialog open={overlay.isOpen('checkpoint')} onSave={handleCheckpoint} />
       </section>
-    </div>
+    </ThoughtLayout>
   )
 }

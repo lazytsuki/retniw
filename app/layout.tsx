@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
 import { ServiceWorkerRegistration } from '@/src/components/pwa/service-worker-registration'
 import { OverlayProvider } from '@/src/components/overlay-provider'
+import { WorkspaceSidebarProvider } from '@/src/components/workspace-sidebar-provider'
 import '@/src/index.css'
 
 export const metadata: Metadata = {
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="zh-CN">
       <body>
         <ServiceWorkerRegistration />
-        <OverlayProvider>{children}</OverlayProvider>
+        <WorkspaceSidebarProvider>
+          <OverlayProvider>{children}</OverlayProvider>
+        </WorkspaceSidebarProvider>
       </body>
     </html>
   )

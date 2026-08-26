@@ -260,6 +260,17 @@
   color: #d5a09a;
 }
 
+.notice {
+  margin-top: 14px;
+  color: rgb(191 216 208 / 70%);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.intro[aria-busy="true"] {
+  border-color: rgb(191 216 208 / 18%);
+}
+
 .retry,
 .more {
   margin-top: 12px;

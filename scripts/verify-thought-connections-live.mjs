@@ -45,7 +45,12 @@ async function api(path, cookie, init = {}) {
 async function createThought(userId, content) {
   const thoughtId = crypto.randomUUID()
   const entryId = crypto.randomUUID()
-  let result = await service.from('thoughts').insert({ id: thoughtId, user_id: userId })
+  let result = await service.from('thoughts').insert({
+    id: thoughtId,
+    user_id: userId,
+    summary_content: content.slice(0, 500),
+    summary_entry_type: 'user',
+  })
   assert.ifError(result.error)
   result = await service.from('entries').insert({
     id: entryId,
@@ -64,13 +69,26 @@ try {
   const other = await createUser('other')
   const first = await createThought(owner.id, '第一段关系验收内容')
   const second = await createThought(owner.id, '第二段关系验收内容')
-  const single = await createThought(other.id, '只有一个过程时不应虚构关系')
+  await createThought(other.id, '只有一个过程时不应虚构关系')
 
-  const singleCheck = await api(`/api/thoughts/${single.thoughtId}/relations/check`, other.cookie, {
+  const anonymousScan = await fetch(`${baseUrl}/api/review/scan`, {
     method: 'POST',
   })
-  assert.equal(singleCheck.status, 200)
-  assert.equal((await singleCheck.json()).data.connection, null)
+  assert.equal(anonymousScan.status, 401)
+
+  const enableReview = await api('/api/review/preference', other.cookie, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  })
+  assert.equal(enableReview.status, 200)
+  assert.equal((await enableReview.json()).data.preference.enabled, true)
+
+  const singleScan = await api('/api/review/scan', other.cookie, { method: 'POST' })
+  assert.equal(singleScan.status, 200)
+  assert.deepEqual(await singleScan.json(), {
+    data: { status: 'not-enough-content', created: 0 },
+  })
 
   const [source, target] = [first, second].sort((left, right) =>
     left.thoughtId.localeCompare(right.thoughtId),
@@ -134,7 +152,15 @@ try {
   console.log(
     JSON.stringify({
       result: 'PASS',
-      checks: ['single thought', 'concurrent uniqueness', 'one-time decision', 'owner isolation', 'no revival'],
+      checks: [
+        'scan authentication',
+        'review preference boundary',
+        'single thought scan',
+        'concurrent uniqueness',
+        'one-time decision',
+        'owner isolation',
+        'no revival',
+      ],
     }),
   )
 } finally {

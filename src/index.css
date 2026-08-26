@@ -61,15 +61,50 @@ a {
   max-width: 1440px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 0 max(32px, env(safe-area-inset-right)) 64px max(32px, env(safe-area-inset-left));
+  padding: 0 max(32px, env(safe-area-inset-right)) 24px max(32px, env(safe-area-inset-left));
 }
 
 .app-header {
+  --workspace-sidebar-width: clamp(230px, 20vw, 280px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr) auto;
+  column-gap: clamp(48px, 7vw, 104px);
   align-items: center;
   height: 48px;
   padding-top: 20px;
+}
+
+@media (min-width: 901px) {
+  .app-header {
+    position: sticky;
+    z-index: 50;
+    top: 0;
+    background: linear-gradient(180deg, rgb(8 9 11 / 96%) 0%, rgb(8 9 11 / 88%) 76%, transparent 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+}
+
+.app-header--sidebar-collapsed {
+  --workspace-sidebar-width: 64px;
+  column-gap: clamp(32px, 5vw, 72px);
+}
+
+.app-header__sidebar {
+  display: flex;
+  width: var(--workspace-sidebar-width);
+  min-width: 0;
+  align-items: center;
+  transition: width 180ms ease;
+}
+
+.desktop-sidebar-brand {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .brand {
@@ -94,8 +129,92 @@ a {
   object-fit: contain;
 }
 
+.mobile-app-brand,
+.sidebar-expand-action {
+  display: none;
+}
+
+.sidebar-collapse-action,
+.sidebar-expand-action {
+  border: 0;
+  background: transparent;
+  color: rgb(245 245 243 / 42%);
+  cursor: pointer;
+}
+
+.sidebar-collapse-action {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.sidebar-collapse-action:hover,
+.sidebar-collapse-action:focus-visible,
+.sidebar-expand-action:hover,
+.sidebar-expand-action:focus-visible {
+  outline: none;
+  background: rgb(255 255 255 / 7%);
+  color: rgb(245 245 243 / 82%);
+}
+
+.sidebar-collapse-action svg,
+.sidebar-expand-action__icon svg {
+  width: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.app-header--sidebar-collapsed .desktop-sidebar-brand {
+  display: none;
+}
+
+.app-header--sidebar-collapsed .sidebar-expand-action {
+  position: relative;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  padding: 0;
+  border-radius: 14px;
+}
+
+.app-header--sidebar-collapsed .app-header__sidebar {
+  justify-content: center;
+}
+
+.sidebar-expand-action__logo,
+.sidebar-expand-action__icon {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.sidebar-expand-action__icon {
+  opacity: 0;
+  transform: scale(0.88);
+}
+
+.sidebar-expand-action:hover .sidebar-expand-action__logo,
+.sidebar-expand-action:focus-visible .sidebar-expand-action__logo {
+  opacity: 0;
+  transform: scale(0.88);
+}
+
+.sidebar-expand-action:hover .sidebar-expand-action__icon,
+.sidebar-expand-action:focus-visible .sidebar-expand-action__icon {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .account-menu {
   position: relative;
+  grid-column: 3;
   justify-self: end;
   color: rgb(245 245 243 / 52%);
   font-size: 12px;
@@ -249,6 +368,20 @@ input::placeholder {
   font-size: 13px;
 }
 
+.capture-mobile-hint {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .capture-shortcut-hint {
+    display: none;
+  }
+
+  .capture-mobile-hint {
+    display: inline;
+  }
+}
+
 .capture-actions button {
   display: grid;
   width: 44px;
@@ -360,17 +493,27 @@ a.fragment-card:hover {
 }
 
 .thought-layout {
+  --thought-layout-top: clamp(38px, 6vh, 72px);
+  --thought-sidebar-top: 32px;
+  --workspace-sidebar-width: clamp(230px, 20vw, 280px);
   display: grid;
-  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+  grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr);
   gap: clamp(48px, 7vw, 104px);
   align-items: start;
-  padding-top: clamp(38px, 6vh, 72px);
+  padding-top: var(--thought-sidebar-top);
+  transition: grid-template-columns 180ms ease, gap 180ms ease;
+}
+
+.thought-layout--sidebar-collapsed {
+  --workspace-sidebar-width: 64px;
+  gap: clamp(32px, 5vw, 72px);
 }
 
 .thought-main {
   width: 100%;
   min-width: 0;
   max-width: 820px;
+  padding-top: calc(var(--thought-layout-top) - var(--thought-sidebar-top));
 }
 
 .export-menu {
@@ -502,16 +645,23 @@ a.fragment-card:hover {
 
 .thought-sidebar {
   position: sticky;
-  top: 24px;
+  top: calc(48px + var(--thought-sidebar-top));
+  display: flex;
+  height: calc(100dvh - 48px - var(--thought-sidebar-top) - 24px);
   min-width: 0;
-  max-height: calc(100vh - 120px);
-  overflow-x: hidden;
-  overflow-y: auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: visible;
   scrollbar-width: thin;
   scrollbar-color: rgb(255 255 255 / 10%) transparent;
 }
 
+.thought-sidebar[data-collapsed="true"] {
+  align-items: center;
+}
+
 .new-thought-action {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -522,6 +672,28 @@ a.fragment-card:hover {
   color: rgb(245 245 243 / 78%);
   text-decoration: none;
   transition: border-color 140ms ease, background 140ms ease;
+}
+
+.thought-sidebar[data-collapsed="true"] .new-thought-action {
+  width: 52px;
+  min-height: 52px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 14px;
+}
+
+.thought-sidebar[data-collapsed="true"] .new-thought-action[aria-current="page"],
+.thought-sidebar[data-collapsed="true"] .new-thought-action:hover,
+.thought-sidebar[data-collapsed="true"] .new-thought-action:focus-visible {
+  outline: none;
+  border-color: transparent;
+  background: rgb(255 255 255 / 7%);
+}
+
+.thought-sidebar[data-collapsed="true"] .new-thought-action > span {
+  display: none;
 }
 
 .new-thought-action:hover {
@@ -545,7 +717,17 @@ a.fragment-card:hover {
 }
 
 .all-thoughts {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   padding-top: 30px;
+  overflow: hidden;
+}
+
+.all-thoughts--collapsed {
+  padding-top: 0;
+  overflow: visible;
 }
 
 .all-thoughts h2,
@@ -586,26 +768,32 @@ a.fragment-card:hover {
   opacity: 0.5;
 }
 
-.mobile-workspace-nav {
+.mobile-workspace-toolbar {
   display: none;
 }
 
 .thought-history-dialog {
   position: fixed;
-  inset: auto 0 0;
-  width: min(100%, 680px);
+  inset: 0 auto 0 0;
+  width: min(calc(100vw - 24px), 410px);
+  height: 100dvh;
   min-width: 0;
   max-width: none;
-  max-height: min(78dvh, 760px);
-  margin: 0 auto;
+  max-height: none;
+  margin: 0;
   padding: 0;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 12%);
-  border-bottom: 0;
-  border-radius: 22px 22px 0 0;
+  border-left: 0;
+  border-radius: 0 22px 22px 0;
   background: rgb(14 17 19 / 96%);
   color: #f2f2ef;
-  box-shadow: 0 -24px 70px rgb(0 0 0 / 48%);
+  box-shadow: 24px 0 70px rgb(0 0 0 / 48%);
+}
+
+.thought-history-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .thought-history-dialog::backdrop {
@@ -615,32 +803,84 @@ a.fragment-card:hover {
 
 .thought-history-dialog__header {
   display: flex;
-  min-height: 58px;
+  min-height: calc(62px + env(safe-area-inset-top));
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
+  gap: 6px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
   border-bottom: 1px solid rgb(255 255 255 / 8%);
 }
 
 .thought-history-dialog__header h2 {
-  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0 0 0 6px;
+  overflow: hidden;
   color: rgb(245 245 243 / 75%);
   font-size: 15px;
   letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .thought-history-dialog__header button {
-  padding: 7px 9px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  padding: 0;
   border: 0;
+  border-radius: 50%;
   background: transparent;
   color: rgb(245 245 243 / 50%);
   cursor: pointer;
 }
 
+.thought-history-dialog__header button:hover,
+.thought-history-dialog__header button:focus-visible {
+  outline: none;
+  background: rgb(255 255 255 / 7%);
+  color: rgb(245 245 243 / 82%);
+}
+
+.thought-history-dialog__header button svg {
+  width: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .thought-history-dialog__body {
-  max-height: calc(min(78dvh, 760px) - 58px);
-  padding: 12px 14px calc(22px + env(safe-area-inset-bottom));
+  display: flex;
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.thought-navigation__content {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.thought-navigation__scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 4px;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 10%) transparent;
+}
+
+.thought-history-dialog .thought-navigation__scroll {
+  padding: 12px 14px 18px;
 }
 
 .thought-navigation__heading {
@@ -723,6 +963,66 @@ a.fragment-card:hover {
   padding-top: 4px;
 }
 
+.thought-navigation__footer {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+}
+
+.thought-history-dialog .thought-navigation__footer {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 0;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+  background: rgb(14 17 19 / 98%);
+}
+
+.thought-history-dialog .thought-navigation__footer > button,
+.thought-history-dialog .thought-navigation__footer > a {
+  min-height: 46px;
+  grid-template-columns: 19px auto;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.thought-history-dialog .thought-navigation__footer .thought-navigation__chevron {
+  display: none;
+}
+
+.thought-navigation__footer--compact {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.thought-navigation__secondary.thought-navigation__footer--compact > button,
+.thought-navigation__secondary.thought-navigation__footer--compact > a {
+  display: grid;
+  width: 52px;
+  min-height: 52px;
+  margin: 0 auto;
+  grid-template-columns: 1fr;
+  place-items: center;
+  gap: 0;
+  padding: 0;
+  border-radius: 14px;
+}
+
+.thought-navigation__footer--compact > button > span,
+.thought-navigation__footer--compact > a > span,
+.thought-navigation__footer--compact .thought-navigation__chevron {
+  display: none;
+}
+
+.thought-navigation__secondary.thought-navigation__footer--compact svg {
+  width: 20px;
+}
+
 .thought-navigation__secondary > button,
 .thought-navigation__secondary > a {
   display: grid;
@@ -745,9 +1045,43 @@ a.fragment-card:hover {
 
 .thought-navigation__secondary > button:hover,
 .thought-navigation__secondary > a:hover,
+.thought-navigation__secondary > button[aria-current="page"],
 .thought-navigation__secondary > a[aria-current="page"] {
   background: rgb(255 255 255 / 4%);
   color: rgb(245 245 243 / 76%);
+}
+
+[data-sidebar-tooltip] {
+  position: relative;
+}
+
+[data-sidebar-tooltip]::after {
+  position: absolute;
+  z-index: 100;
+  top: 50%;
+  left: calc(100% + 12px);
+  padding: 7px 10px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 8px;
+  background: rgb(32 34 37 / 98%);
+  color: rgb(255 255 255 / 90%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  content: attr(data-sidebar-tooltip);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(4px, -50%);
+  transition: opacity 120ms ease, transform 120ms ease;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+[data-sidebar-tooltip]:hover::after,
+[data-sidebar-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+  visibility: visible;
 }
 
 .thought-navigation__secondary svg {
@@ -804,8 +1138,9 @@ a.fragment-card:hover {
   border-bottom: 1px solid rgb(255 255 255 / 8%);
 }
 
+#current-thought,
 .thought-entry[id] {
-  scroll-margin-top: 28px;
+  scroll-margin-top: 72px;
 }
 
 .thought-entry:first-child {
@@ -1082,6 +1417,35 @@ a.fragment-card:hover {
   min-height: 190px;
 }
 
+.thought-composer[data-mode="continuation"] {
+  border-color: rgb(255 255 255 / 20%);
+  background: linear-gradient(145deg, rgb(255 255 255 / 10%), transparent 46%), rgb(20 24 26 / 90%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 9%), 0 22px 64px rgb(0 0 0 / 26%);
+}
+
+.thought-composer[data-mode="continuation"]:focus-within {
+  border-color: rgb(191 216 208 / 46%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 11%), 0 0 0 2px rgb(191 216 208 / 8%), 0 28px 76px rgb(0 0 0 / 34%);
+}
+
+.thought-composer__label {
+  display: block;
+  padding: 18px 22px 0;
+  color: rgb(245 245 243 / 66%);
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: .02em;
+}
+
+.thought-composer[data-mode="continuation"] textarea {
+  min-height: 190px;
+  padding: 11px 22px 12px;
+}
+
+.thought-composer textarea::placeholder {
+  color: rgb(245 245 243 / 46%);
+}
+
 .sync-status {
   min-height: 20px;
   margin: 12px 4px 0;
@@ -1113,7 +1477,8 @@ a.fragment-card:hover {
   margin-top: 16px;
 }
 
-.thinking-assist button {
+.thinking-assist button,
+.thinking-assist a {
   display: flex;
   min-height: 40px;
   align-items: center;
@@ -1123,12 +1488,15 @@ a.fragment-card:hover {
   border-radius: 999px;
   background: rgb(191 216 208 / 7%);
   color: rgb(230 238 234 / 72%);
+  font: inherit;
   font-size: 12px;
+  text-decoration: none;
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
-.thinking-assist button:hover:not(:disabled) {
+.thinking-assist button:hover:not(:disabled),
+.thinking-assist a:hover {
   border-color: rgb(191 216 208 / 30%);
   background: rgb(191 216 208 / 11%);
   color: rgb(238 244 241 / 92%);
@@ -1691,6 +2059,21 @@ a.fragment-card:hover {
   pointer-events: none;
 }
 
+.thought-layout--sidebar-collapsed.thought-skeleton .thought-sidebar {
+  overflow: hidden;
+}
+
+.thought-layout--sidebar-collapsed.thought-skeleton .thought-sidebar .skeleton-card {
+  width: 52px;
+  height: 52px;
+  margin-inline: auto;
+}
+
+.thought-layout--sidebar-collapsed.thought-skeleton .thought-sidebar .skeleton-card:nth-child(n + 2),
+.thought-layout--sidebar-collapsed.thought-skeleton .thought-sidebar .skeleton-line {
+  display: none;
+}
+
 .skeleton-line,
 .skeleton-composer,
 .skeleton-card {
@@ -2052,7 +2435,32 @@ a.fragment-card:hover {
   .app-shell {
     max-width: 732px;
     padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
-    padding-bottom: calc(128px + env(safe-area-inset-bottom));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  .app-header,
+  .app-header--sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+  }
+
+  .app-header__sidebar,
+  .app-header--sidebar-collapsed .app-header__sidebar {
+    width: auto;
+    justify-content: flex-start;
+  }
+
+  .desktop-sidebar-brand,
+  .app-header--sidebar-collapsed .sidebar-expand-action {
+    display: none;
+  }
+
+  .mobile-app-brand {
+    display: inline-flex;
+  }
+
+  .account-menu {
+    grid-column: 2;
   }
 
   .capture-layout,
@@ -2069,8 +2477,10 @@ a.fragment-card:hover {
 
   .thought-main {
     max-width: 100%;
+    padding-top: 0;
   }
 
+  #current-thought,
   .thought-entry[id] {
     scroll-margin-top: 82px;
   }
@@ -2079,54 +2489,82 @@ a.fragment-card:hover {
     display: none;
   }
 
-  .mobile-workspace-nav {
+  .mobile-workspace-toolbar {
     position: sticky;
     z-index: 40;
     top: 8px;
     display: flex;
-    width: min(340px, 100%);
-    min-height: 58px;
-    align-items: center;
-    margin: 0 auto 24px;
-    padding: 5px;
-    border: 1px solid rgb(255 255 255 / 13%);
-    border-radius: 18px;
-    background: rgb(16 19 21 / 96%);
-    box-shadow: 0 12px 34px rgb(0 0 0 / 30%);
-  }
-
-  .mobile-workspace-nav > a,
-  .mobile-workspace-nav > button {
-    display: flex;
-    flex: 1 1 0;
-    min-width: 0;
+    width: 100%;
     min-height: 46px;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 20px;
+    pointer-events: none;
+  }
+
+  .mobile-workspace-toolbar > a,
+  .mobile-workspace-toolbar > button {
+    display: flex;
+    min-width: 0;
+    min-height: 44px;
+    align-items: center;
     justify-content: center;
-    gap: 7px;
-    padding: 6px;
-    border: 0;
-    border-radius: 13px;
-    background: transparent;
-    color: rgb(245 245 243 / 54%);
+    gap: 8px;
+    border: 1px solid rgb(255 255 255 / 11%);
+    background: rgb(15 18 20 / 88%);
+    color: rgb(245 245 243 / 68%);
     font-size: 12px;
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
+    box-shadow: 0 10px 28px rgb(0 0 0 / 20%);
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
+    pointer-events: auto;
   }
 
-  .mobile-workspace-nav > a:focus,
-  .mobile-workspace-nav > button:focus {
+  .mobile-history-action {
+    padding: 8px 13px;
+    border-radius: 999px;
+  }
+
+  .mobile-new-thought-action {
+    width: 44px;
+    flex: 0 0 44px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .mobile-new-thought-action > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .mobile-workspace-toolbar > a:focus,
+  .mobile-workspace-toolbar > button:focus {
     outline: none;
   }
 
-  .mobile-workspace-nav > a:focus-visible,
-  .mobile-workspace-nav > button:focus-visible {
-    box-shadow: inset 0 0 0 1px rgb(191 216 208 / 42%);
+  .mobile-workspace-toolbar > a:hover,
+  .mobile-workspace-toolbar > button:hover,
+  .mobile-workspace-toolbar > a:focus-visible,
+  .mobile-workspace-toolbar > button:focus-visible,
+  .mobile-workspace-toolbar > button[aria-expanded="true"] {
+    border-color: rgb(191 216 208 / 24%);
+    background: rgb(23 28 29 / 94%);
+    color: rgb(245 245 243 / 90%);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 26%), inset 0 0 0 1px rgb(191 216 208 / 10%);
   }
 
-  .mobile-workspace-nav svg {
+  .mobile-workspace-toolbar svg {
     width: 18px;
+    flex: 0 0 18px;
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -2134,13 +2572,16 @@ a.fragment-card:hover {
     stroke-width: 1.6;
   }
 
-  .mobile-workspace-nav > [aria-current="page"] {
-    background: rgb(255 255 255 / 8%);
-    color: rgb(245 245 243 / 90%);
+  .mobile-new-thought-action svg {
+    color: var(--accent);
   }
 
   .capture-surface textarea {
     min-height: 220px;
+  }
+
+  .thought-composer[data-mode="continuation"] textarea {
+    min-height: 190px;
   }
 
   .thought-action-menu__trigger {
@@ -2184,7 +2625,7 @@ a.fragment-card:hover {
     max-width: none;
     padding-right: max(12px, env(safe-area-inset-right));
     padding-left: max(12px, env(safe-area-inset-left));
-    padding-bottom: calc(128px + env(safe-area-inset-bottom));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }
 
   .app-header {
@@ -2211,8 +2652,40 @@ a.fragment-card:hover {
     font-size: 17px;
   }
 
-  .thought-composer textarea {
-    min-height: 150px;
+  .thought-composer[data-mode="continuation"] textarea {
+    min-height: 180px;
+    padding: 10px 18px;
+  }
+
+  .thought-composer__label {
+    padding: 16px 18px 0;
+  }
+
+  .thought-composer--initial,
+  .thought-composer--initial:focus-within {
+    overflow: hidden;
+    border-color: rgb(255 255 255 / 16%);
+    border-radius: 19px;
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  }
+
+  .thought-composer--initial:focus-within {
+    border-color: rgb(191 216 208 / 38%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%), 0 0 0 2px rgb(191 216 208 / 7%);
+  }
+
+  .thought-composer--initial textarea {
+    min-height: clamp(280px, 50dvh, 520px);
+    padding: 20px 18px 10px;
+    font-size: 19px;
+    line-height: 1.7;
+  }
+
+  .thought-composer--initial .capture-actions {
+    min-height: 56px;
+    padding: 6px 12px 10px 18px;
+    border-top: 1px solid rgb(255 255 255 / 8%);
   }
 
   .workspace-heading {
@@ -2263,8 +2736,8 @@ a.fragment-card:hover {
   }
 
   .thought-history-dialog {
-    width: 100%;
-    border-radius: 20px 20px 0 0;
+    width: calc(100vw - 24px);
+    border-radius: 0 20px 20px 0;
   }
 
   .fragment-card {

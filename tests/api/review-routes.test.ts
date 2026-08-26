@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   listForReview: vi.fn(),
   countForReview: vi.fn(),
   decodeCursor: vi.fn(),
+  scanExistingThoughts: vi.fn(),
 }))
 
 vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
@@ -25,9 +26,17 @@ vi.mock('@/src/server/repositories/thought-connection-repository', () => ({
     countForReview = mocks.countForReview
   },
 }))
+vi.mock('@/src/server/review/review-service', () => ({
+  ReviewService: class {
+    static fromClient() {
+      return { scanExistingThoughts: mocks.scanExistingThoughts }
+    }
+  },
+}))
 
 import { GET as getReview } from '@/app/api/review/route'
 import { PATCH as updatePreference } from '@/app/api/review/preference/route'
+import { POST as scanExistingThoughts } from '@/app/api/review/scan/route'
 
 const userId = '018f6f3a-a1c2-47a8-8f1e-b00000000001'
 
@@ -38,6 +47,7 @@ beforeEach(() => {
   mocks.listForReview.mockResolvedValue({ connections: [], nextCursor: null })
   mocks.countForReview.mockResolvedValue(0)
   mocks.setPreference.mockResolvedValue({ enabled: true, updatedAt: '2026-08-24T01:00:00.000Z' })
+  mocks.scanExistingThoughts.mockResolvedValue({ status: 'processed', created: 2 })
 })
 
 describe('review routes', () => {
@@ -113,5 +123,15 @@ describe('review routes', () => {
 
     expect(response.status).toBe(400)
     expect(mocks.setPreference).not.toHaveBeenCalled()
+  })
+
+  it('starts an explicit existing-thought scan for the authenticated user', async () => {
+    const response = await scanExistingThoughts()
+
+    expect(response.status).toBe(200)
+    expect(mocks.scanExistingThoughts).toHaveBeenCalledWith(userId)
+    expect(await response.json()).toEqual({
+      data: { status: 'processed', created: 2 },
+    })
   })
 })

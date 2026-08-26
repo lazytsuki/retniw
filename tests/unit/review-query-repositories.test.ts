@@ -183,4 +183,51 @@ describe('review candidate query', () => {
     expect(query.calls.some((call) => call.method === 'not' && call.args[0] === 'id')).toBe(false)
     expect(query.calls).toContainEqual({ method: 'limit', args: [20] })
   })
+
+  it('reads a bounded user-owned history corpus without excluding the current thought', async () => {
+    const query = new CapturingQuery([{
+      id: ids.sourceThought,
+      summary_content: '最近写下的摘要',
+    }])
+    const repository = new ThoughtRepository(clientFor(query, []))
+
+    await expect(repository.listReviewCorpus(ids.user)).resolves.toEqual([
+      { id: ids.sourceThought, summary: '最近写下的摘要' },
+    ])
+
+    expect(query.calls).toContainEqual({ method: 'eq', args: ['user_id', ids.user] })
+    expect(query.calls).toContainEqual({ method: 'is', args: ['deleted_at', null] })
+    expect(query.calls).toContainEqual({
+      method: 'in',
+      args: ['summary_entry_type', ['user', 'import']],
+    })
+    expect(query.calls).toContainEqual({ method: 'not', args: ['summary_content', 'is', null] })
+    expect(query.calls).toContainEqual({ method: 'limit', args: [20] })
+    expect(query.calls.some((call) => call.method === 'neq')).toBe(false)
+    expect(query.calls.some((call) => call.method === 'not' && call.args[0] === 'id')).toBe(false)
+  })
+})
+
+describe('existing review pairs query', () => {
+  it('reads all statuses for one user so explicit scans cannot recreate decided pairs', async () => {
+    const query = new CapturingQuery([{
+      source_thought_id: ids.sourceThought,
+      target_thought_id: ids.targetThought,
+    }])
+    const fromCalls: string[] = []
+    const repository = new ThoughtConnectionRepository(clientFor(query, fromCalls))
+
+    await expect(repository.listExistingPairs(ids.user)).resolves.toEqual([{
+      sourceThoughtId: ids.sourceThought,
+      targetThoughtId: ids.targetThought,
+    }])
+
+    expect(query.calls).toContainEqual({
+      method: 'select',
+      args: ['source_thought_id, target_thought_id'],
+    })
+    expect(query.calls).toContainEqual({ method: 'eq', args: ['user_id', ids.user] })
+    expect(query.calls.some((call) => call.method === 'eq' && call.args[0] === 'status')).toBe(false)
+    expect(fromCalls).toEqual(['thought_connections'])
+  })
 })
