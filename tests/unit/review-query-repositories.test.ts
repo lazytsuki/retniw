@@ -209,7 +209,7 @@ describe('review candidate query', () => {
 })
 
 describe('existing review pairs query', () => {
-  it('reads all statuses for one user so explicit scans cannot recreate decided pairs', async () => {
+  it('reads all statuses only within the bounded candidate set', async () => {
     const query = new CapturingQuery([{
       source_thought_id: ids.sourceThought,
       target_thought_id: ids.targetThought,
@@ -217,7 +217,12 @@ describe('existing review pairs query', () => {
     const fromCalls: string[] = []
     const repository = new ThoughtConnectionRepository(clientFor(query, fromCalls))
 
-    await expect(repository.listExistingPairs(ids.user)).resolves.toEqual([{
+    await expect(repository.listExistingPairs(ids.user, [
+      ids.sourceThought,
+      ids.targetThought,
+      ids.sourceThought,
+      'invalid),status.eq.pending',
+    ])).resolves.toEqual([{
       sourceThoughtId: ids.sourceThought,
       targetThoughtId: ids.targetThought,
     }])
@@ -227,7 +232,26 @@ describe('existing review pairs query', () => {
       args: ['source_thought_id, target_thought_id'],
     })
     expect(query.calls).toContainEqual({ method: 'eq', args: ['user_id', ids.user] })
+    expect(query.calls).toContainEqual({
+      method: 'in',
+      args: ['source_thought_id', [ids.sourceThought, ids.targetThought]],
+    })
+    expect(query.calls).toContainEqual({
+      method: 'in',
+      args: ['target_thought_id', [ids.sourceThought, ids.targetThought]],
+    })
     expect(query.calls.some((call) => call.method === 'eq' && call.args[0] === 'status')).toBe(false)
+    expect(JSON.stringify(query.calls)).not.toContain('status.eq.pending')
     expect(fromCalls).toEqual(['thought_connections'])
+  })
+
+  it('skips the database when fewer than two valid candidates remain', async () => {
+    const query = new CapturingQuery([])
+    const fromCalls: string[] = []
+    const repository = new ThoughtConnectionRepository(clientFor(query, fromCalls))
+
+    await expect(repository.listExistingPairs(ids.user, [ids.sourceThought, 'invalid'])).resolves.toEqual([])
+
+    expect(fromCalls).toEqual([])
   })
 })

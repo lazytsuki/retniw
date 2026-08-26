@@ -36,7 +36,7 @@ type ReviewServiceDependencies = {
     firstUserEntry(userId: string, thoughtId: string): Promise<ReviewEntry | null>
   }
   connections: {
-    listExistingPairs(userId: string): Promise<ExistingReviewPair[]>
+    listExistingPairs(userId: string, candidateThoughtIds: readonly string[]): Promise<ExistingReviewPair[]>
     listExistingTargets(userId: string, thoughtId: string): Promise<Set<string>>
     createCandidate(input: {
       userId: string
@@ -165,7 +165,10 @@ export class ReviewService {
 
     const candidates = await this.dependencies.thoughts.listReviewCorpus(userId)
     if (candidates.length < 2) return { status: 'not-enough-content', created: 0 }
-    const existingPairs = await this.dependencies.connections.listExistingPairs(userId)
+    const existingPairs = await this.dependencies.connections.listExistingPairs(
+      userId,
+      candidates.map((candidate) => candidate.id),
+    )
 
     let suggestions: ReviewPairSuggestion[]
     try {

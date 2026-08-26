@@ -206,7 +206,10 @@ describe('ReviewService', () => {
     })
 
     expect(deps.thoughts.listReviewCorpus).toHaveBeenCalledWith(ids.user)
-    expect(deps.connections.listExistingPairs).toHaveBeenCalledWith(ids.user)
+    expect(deps.connections.listExistingPairs).toHaveBeenCalledWith(
+      ids.user,
+      [ids.firstTarget, ids.secondTarget],
+    )
     expect(deps.provider.findConnectionPairs).toHaveBeenCalledWith(corpus, existingPairs)
     expect(deps.entries.firstUserEntry).toHaveBeenCalledWith(ids.user, ids.firstTarget)
     expect(deps.entries.firstUserEntry).toHaveBeenCalledWith(ids.user, ids.secondTarget)

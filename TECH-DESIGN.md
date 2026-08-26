@@ -116,7 +116,7 @@ flowchart TD
 
 - 需求/验收：用户不需要先新增一条内容，就能在回看中主动寻找既有想法之间的联系；当前想法AI仍只读当前内容。
 - 实现目标：`retniw-web`提供唯一显式入口，`retniw-api`复用既有候选和用户判断链路，不新增第二套关系模型或聊天上下文。
-- 增量修改：新增`POST /api/review/scan`。服务端先读取偏好，未开启时不读取历史；已开启时读取当前账号最多20条`deleted_at is null`、摘要来源为`user | import`的最近想法，可包含归档。读取全部状态的既有关系对并排除后，单次调用`DeepSeekTextProvider.findConnectionPairs`，只接受候选集内最多3个不重复、非自连接、未出现过的想法对和每条不超过300字的依据。两端锚点均取各自首条user/import entry，持久化复用`ThoughtConnectionRepository.createCandidate`，结果只进入pending。
+- 增量修改：新增`POST /api/review/scan`。服务端先读取偏好，未开启时不读取历史；已开启时读取当前账号最多20条`deleted_at is null`、摘要来源为`user | import`的最近想法，可包含归档。只读取两端都位于本次候选集内、不限状态的既有关系对并排除后，单次调用`DeepSeekTextProvider.findConnectionPairs`，只接受候选集内最多3个不重复、非自连接、未出现过的想法对和每条不超过300字的依据。两端锚点均取各自首条user/import entry，持久化复用`ThoughtConnectionRepository.createCandidate`，结果只进入pending。
 - 受影响符号：`ReviewWorkspace`、`POST /api/review/scan`、`ReviewService.scanExistingThoughts`、`ThoughtRepository.listReviewCorpus`、`ThoughtConnectionRepository.listExistingPairs`、`DeepSeekTextProvider.findConnectionPairs`
 - 验证入口：关闭状态不读历史、不调用模型；少于2条想法不调用模型；输入上限20条、每条500字、结果上限3条；未知ID、自连接、重复pair、既有pair和超长依据全部拒绝；供应商失败可重试且不记录正文；候选两端均能打开原文。
 - 边界与不变约束：主动扫描不调用`claimForReview`，不消耗保存后处理的entry认领状态；不创建用户正文或AI正文，不自动确认关系，不读取AI摘要、已删除内容或其他账号内容。

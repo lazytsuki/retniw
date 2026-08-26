@@ -135,11 +135,16 @@ export class ThoughtConnectionRepository {
       : record.source_thought_id))
   }
 
-  async listExistingPairs(userId: string) {
+  async listExistingPairs(userId: string, candidateThoughtIds: readonly string[]) {
+    const candidateIds = Array.from(new Set(candidateThoughtIds.filter((id) => UUID_PATTERN.test(id))))
+    if (candidateIds.length < 2) return []
+
     const { data, error } = await this.client
       .from('thought_connections')
       .select('source_thought_id, target_thought_id')
       .eq('user_id', userId)
+      .in('source_thought_id', candidateIds)
+      .in('target_thought_id', candidateIds)
       .returns<Array<{ source_thought_id: string; target_thought_id: string }>>()
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read existing connection pairs')
 
