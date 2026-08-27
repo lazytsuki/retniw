@@ -471,6 +471,209 @@ describe('deleted thought guards', () => {
   })
 })
 
+describe('rejected connection reconsideration', () => {
+  const oldSourceEntry = '018f6f3a-a1c2-47a8-8f1e-900000000010'
+  const connectionId = '018f6f3a-a1c2-47a8-8f1e-900000000011'
+
+  function entry(input: {
+    id: string
+    thoughtId: string
+    content: string
+    createdAt: string
+  }) {
+    return {
+      id: input.id,
+      user_id: ids.user,
+      thought_id: input.thoughtId,
+      client_request_id: input.id,
+      entry_type: 'user',
+      content: input.content,
+      source_label: null,
+      ai_action: null,
+      created_at: input.createdAt,
+    }
+  }
+
+  function rejectedConnection() {
+    return {
+      id: connectionId,
+      user_id: ids.user,
+      source_thought_id: ids.thought,
+      target_thought_id: ids.otherThought,
+      source_entry_id: oldSourceEntry,
+      target_entry_id: ids.otherEntry,
+      rationale: '上一次理由',
+      status: 'rejected',
+      decided_at: '2026-08-22T02:00:00.000Z',
+      created_at: '2026-08-22T01:00:00.000Z',
+    }
+  }
+
+  it('reuses the same pair after a newer user entry and does not overwrite the new pending state', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-22T04:00:00.000Z'))
+    const memory = memoryClient({
+      thoughts: [thought(), thought({ id: ids.otherThought })],
+      entries: [
+        entry({
+          id: oldSourceEntry,
+          thoughtId: ids.thought,
+          content: '原来的内容',
+          createdAt: '2026-08-22T00:00:00.000Z',
+        }),
+        entry({
+          id: ids.entry,
+          thoughtId: ids.thought,
+          content: '忽略之后的新内容',
+          createdAt: '2026-08-22T03:00:00.000Z',
+        }),
+        entry({
+          id: ids.otherEntry,
+          thoughtId: ids.otherThought,
+          content: '另一端内容',
+          createdAt: '2026-08-22T00:30:00.000Z',
+        }),
+      ],
+      connections: [rejectedConnection()],
+    })
+    const repository = new ThoughtConnectionRepository(memory.client)
+    const input = {
+      userId: ids.user,
+      currentThoughtId: ids.thought,
+      targetThoughtId: ids.otherThought,
+      currentEntryId: ids.entry,
+      targetEntryId: ids.otherEntry,
+      rationale: '新内容让两边出现了新的关系',
+    }
+
+    await expect(repository.createCandidate(input)).resolves.toMatchObject({
+      created: true,
+      connection: {
+        id: connectionId,
+        status: 'pending',
+        rationale: '新内容让两边出现了新的关系',
+        decidedAt: null,
+        createdAt: '2026-08-22T04:00:00.000Z',
+      },
+    })
+    expect(memory.tables.thought_connections).toHaveLength(1)
+    expect(memory.tables.thought_connections[0]).toMatchObject({
+      id: connectionId,
+      source_entry_id: ids.entry,
+      target_entry_id: ids.otherEntry,
+      status: 'pending',
+      rationale: '新内容让两边出现了新的关系',
+      decided_at: null,
+      created_at: '2026-08-22T04:00:00.000Z',
+    })
+
+    await expect(repository.createCandidate({
+      ...input,
+      rationale: '并发或重试不能覆盖待判断理由',
+    })).resolves.toMatchObject({ created: false })
+    expect(memory.tables.thought_connections[0].rationale).toBe('新内容让两边出现了新的关系')
+  })
+
+  it('keeps a rejected pair closed when both supplied anchors predate the decision', async () => {
+    const memory = memoryClient({
+      thoughts: [thought(), thought({ id: ids.otherThought })],
+      entries: [
+        entry({
+          id: oldSourceEntry,
+          thoughtId: ids.thought,
+          content: '原来的内容',
+          createdAt: '2026-08-22T00:00:00.000Z',
+        }),
+        entry({
+          id: ids.otherEntry,
+          thoughtId: ids.otherThought,
+          content: '另一端内容',
+          createdAt: '2026-08-22T00:30:00.000Z',
+        }),
+      ],
+      connections: [rejectedConnection()],
+    })
+
+    await expect(new ThoughtConnectionRepository(memory.client).createCandidate({
+      userId: ids.user,
+      currentThoughtId: ids.thought,
+      targetThoughtId: ids.otherThought,
+      currentEntryId: oldSourceEntry,
+      targetEntryId: ids.otherEntry,
+      rationale: '没有新内容时不能重提',
+    })).resolves.toEqual({ connection: null, created: false })
+    expect(memory.tables.thought_connections[0]).toMatchObject(rejectedConnection())
+  })
+
+  it('keeps a rejected pair closed when new content yields the same reason', async () => {
+    const memory = memoryClient({
+      thoughts: [thought(), thought({ id: ids.otherThought })],
+      entries: [
+        entry({
+          id: ids.entry,
+          thoughtId: ids.thought,
+          content: '忽略之后的新内容',
+          createdAt: '2026-08-22T03:00:00.000Z',
+        }),
+        entry({
+          id: ids.otherEntry,
+          thoughtId: ids.otherThought,
+          content: '另一端内容',
+          createdAt: '2026-08-22T00:30:00.000Z',
+        }),
+      ],
+      connections: [rejectedConnection()],
+    })
+
+    await expect(new ThoughtConnectionRepository(memory.client).createCandidate({
+      userId: ids.user,
+      currentThoughtId: ids.thought,
+      targetThoughtId: ids.otherThought,
+      currentEntryId: ids.entry,
+      targetEntryId: ids.otherEntry,
+      rationale: '  上一次理由  ',
+    })).resolves.toEqual({ connection: null, created: false })
+    expect(memory.tables.thought_connections[0]).toMatchObject(rejectedConnection())
+  })
+
+  it.each(['pending', 'confirmed'] as const)('never overwrites a %s pair', async (status) => {
+    const current = {
+      ...rejectedConnection(),
+      status,
+      decided_at: status === 'confirmed' ? '2026-08-22T02:00:00.000Z' : null,
+      rationale: '已经生效的理由',
+    }
+    const memory = memoryClient({
+      thoughts: [thought(), thought({ id: ids.otherThought })],
+      entries: [
+        entry({
+          id: ids.entry,
+          thoughtId: ids.thought,
+          content: '后续新增内容',
+          createdAt: '2026-08-22T03:00:00.000Z',
+        }),
+        entry({
+          id: ids.otherEntry,
+          thoughtId: ids.otherThought,
+          content: '另一端内容',
+          createdAt: '2026-08-22T00:30:00.000Z',
+        }),
+      ],
+      connections: [current],
+    })
+
+    await expect(new ThoughtConnectionRepository(memory.client).createCandidate({
+      userId: ids.user,
+      currentThoughtId: ids.thought,
+      targetThoughtId: ids.otherThought,
+      currentEntryId: ids.entry,
+      targetEntryId: ids.otherEntry,
+      rationale: '不能覆盖原状态',
+    })).resolves.toMatchObject({ created: false })
+    expect(memory.tables.thought_connections[0]).toMatchObject(current)
+  })
+})
+
 describe('global review connection view', () => {
   it('labels the newer anchor as source without changing the normalized stored pair', async () => {
     const connectionId = '018f6f3a-a1c2-47a8-8f1e-900000000008'

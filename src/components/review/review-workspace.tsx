@@ -3,6 +3,11 @@
 import Link from 'next/link'
 import { useCallback, useRef, useState } from 'react'
 import styles from './review-workspace.module.css'
+import {
+  createProductEventRequestId,
+  recordConnectionOpened,
+  useVisibleProductEvent,
+} from '@/src/components/product-event-sender'
 import type { ReviewPreference } from '@/src/server/repositories/review-preference-repository'
 import type { ReviewConnection } from '@/src/server/repositories/thought-connection-repository'
 
@@ -89,14 +94,20 @@ function ConnectionCard({
         <div>
           <span>后来写的</span>
           <p>{connection.source.excerpt}</p>
-          <Link href={`/thoughts/${connection.source.thoughtId}#entry-${connection.source.entryId}`}>
+          <Link
+            href={`/thoughts/${connection.source.thoughtId}#entry-${connection.source.entryId}`}
+            onClick={() => recordConnectionOpened(connection.id, connection.source.thoughtId)}
+          >
             打开原文<ArrowMark />
           </Link>
         </div>
         <div>
           <span>更早写的</span>
           <p>{connection.target.excerpt}</p>
-          <Link href={`/thoughts/${connection.target.thoughtId}#entry-${connection.target.entryId}`}>
+          <Link
+            href={`/thoughts/${connection.target.thoughtId}#entry-${connection.target.entryId}`}
+            onClick={() => recordConnectionOpened(connection.id, connection.target.thoughtId)}
+          >
             打开原文<ArrowMark />
           </Link>
         </div>
@@ -114,6 +125,7 @@ function ConnectionCard({
 }
 
 export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialData | null }) {
+  useVisibleProductEvent('review_opened')
   const [preference, setPreference] = useState<ReviewPreference | null>(initialData?.preference ?? null)
   const [pending, setPending] = useState<ListState>(initialData?.pending ?? emptyList)
   const [confirmed, setConfirmed] = useState<ListState>(initialData?.confirmed ?? emptyList)
@@ -127,6 +139,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
   const [notice, setNotice] = useState('')
   const preferencePendingRef = useRef(false)
   const scanningRef = useRef(false)
+  const scanRequestIdRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -189,9 +202,17 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
     setMessage('')
     setNotice('')
     try {
-      const response = await fetch('/api/review/scan', { method: 'POST' })
+      if (!scanRequestIdRef.current) {
+        scanRequestIdRef.current = createProductEventRequestId()
+      }
+      const response = await fetch('/api/review/scan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ requestId: scanRequestIdRef.current }),
+      })
       const payload = await response.json().catch(() => null) as ReviewScanResponse | null
       if (!response.ok || !payload?.data?.status) throw new Error('SCAN_FAILED')
+      scanRequestIdRef.current = null
       if (payload.data.status === 'disabled') {
         setMessage('先开启回看，再开始串联。')
         return
@@ -308,8 +329,8 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
         <h2>串联已有想法</h2>
         <p>
           {preference.enabled
-            ? '把最多20条最近想法的开头片段交给DeepSeek，找出最多3条有依据的联系。结果先由你判断，不改写，也不自动保留。'
-            : '开启后，会先把最多20条最近想法的开头片段交给DeepSeek，找出最多3条有依据的联系；以后保存新内容时也会继续找。结果先由你判断，不改写，也不自动保留。'}
+            ? '把最多20条最近想法的开头和最新一段原文交给DeepSeek，找出最多3条有依据的联系。结果先由你判断，不改写，也不自动保留。'
+            : '开启后，会先把最多20条最近想法的开头和最新一段原文交给DeepSeek，找出最多3条有依据的联系；以后保存新内容时也会继续找。结果先由你判断，不改写，也不自动保留。'}
         </p>
         <button
           type="button"

@@ -34,10 +34,18 @@ type ReviewServiceDependencies = {
   entries: {
     claimForReview(userId: string, thoughtId: string, entryId: string): Promise<ReviewEntry | null>
     firstUserEntry(userId: string, thoughtId: string): Promise<ReviewEntry | null>
+    latestUserEntry(userId: string, thoughtId: string): Promise<ReviewEntry | null>
   }
   connections: {
-    listExistingPairs(userId: string, candidateThoughtIds: readonly string[]): Promise<ExistingReviewPair[]>
-    listExistingTargets(userId: string, thoughtId: string): Promise<Set<string>>
+    listBlockedPairs(
+      userId: string,
+      anchors: readonly { thoughtId: string; createdAt: string }[],
+    ): Promise<ExistingReviewPair[]>
+    listBlockedTargets(
+      userId: string,
+      thoughtId: string,
+      sourceEntryCreatedAt: string,
+    ): Promise<Set<string>>
     createCandidate(input: {
       userId: string
       currentThoughtId: string
@@ -85,6 +93,13 @@ function defaultLog(event: string, code: string) {
   console.error('review_background_event', { event, code })
 }
 
+function currentReviewSummary(previous: string, latest: string) {
+  const prior = previous.trim()
+  const current = latest.trim()
+  if (!prior || prior === current) return current.slice(0, 500)
+  return `原有内容：${prior.slice(0, 180)}\n最新内容：${current.slice(0, 280)}`.slice(0, 500)
+}
+
 export class ReviewService {
   constructor(private readonly dependencies: ReviewServiceDependencies) {}
 
@@ -110,14 +125,15 @@ export class ReviewService {
     )
     if (!source) return { status: 'already-claimed', created: 0 }
 
-    const existingTargets = await this.dependencies.connections.listExistingTargets(
+    const blockedTargets = await this.dependencies.connections.listBlockedTargets(
       input.userId,
       input.thoughtId,
+      source.createdAt,
     )
     const candidates = await this.dependencies.thoughts.listReviewCandidates(
       input.userId,
       input.thoughtId,
-      existingTargets,
+      blockedTargets,
     )
     if (!candidates.length) return { status: 'processed', created: 0 }
 
@@ -165,28 +181,43 @@ export class ReviewService {
 
     const candidates = await this.dependencies.thoughts.listReviewCorpus(userId)
     if (candidates.length < 2) return { status: 'not-enough-content', created: 0 }
-    const existingPairs = await this.dependencies.connections.listExistingPairs(
+    const latestEntries = new Map((await Promise.all(candidates.map(async (candidate) => [
+      candidate.id,
+      await this.dependencies.entries.latestUserEntry(userId, candidate.id),
+    ] as const))).filter((entry): entry is readonly [string, ReviewEntry] => entry[1] !== null))
+    const currentCandidates = candidates.flatMap((candidate) => {
+      const latest = latestEntries.get(candidate.id)
+      return latest ? [{
+        id: candidate.id,
+        summary: currentReviewSummary(candidate.summary, latest.content),
+      }] : []
+    })
+    if (currentCandidates.length < 2) return { status: 'not-enough-content', created: 0 }
+    const existingPairs = await this.dependencies.connections.listBlockedPairs(
       userId,
-      candidates.map((candidate) => candidate.id),
+      Array.from(latestEntries.values()).map((entry) => ({
+        thoughtId: entry.thoughtId,
+        createdAt: entry.createdAt,
+      })),
     )
 
     let suggestions: ReviewPairSuggestion[]
     try {
-      suggestions = await this.dependencies.provider.findConnectionPairs(candidates, existingPairs)
+      suggestions = await this.dependencies.provider.findConnectionPairs(currentCandidates, existingPairs)
     } catch (error) {
       this.dependencies.log('provider_failed', errorCode(error))
       return { status: 'provider-failed', created: 0 }
     }
 
-    const allowedIds = new Set(candidates.map((candidate) => candidate.id))
+    const allowedIds = new Set(currentCandidates.map((candidate) => candidate.id))
     const anchorIds = Array.from(new Set(suggestions.flatMap((suggestion) => [
       suggestion.sourceThoughtId,
       suggestion.targetThoughtId,
     ]))).filter((thoughtId) => allowedIds.has(thoughtId))
-    const anchors = new Map((await Promise.all(anchorIds.map(async (thoughtId) => [
-      thoughtId,
-      await this.dependencies.entries.firstUserEntry(userId, thoughtId),
-    ] as const))).filter((entry): entry is readonly [string, ReviewEntry] => entry[1] !== null))
+    const anchors = new Map(anchorIds.flatMap((thoughtId) => {
+      const entry = latestEntries.get(thoughtId)
+      return entry ? [[thoughtId, entry] as const] : []
+    }))
 
     let created = 0
     let persistenceFailed = false

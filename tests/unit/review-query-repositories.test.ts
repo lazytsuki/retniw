@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
+import { EntryRepository } from '@/src/server/repositories/entry-repository'
 import { ThoughtConnectionRepository } from '@/src/server/repositories/thought-connection-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
 
@@ -30,6 +31,11 @@ class CapturingQuery implements PromiseLike<unknown> {
 
   async returns<T>() {
     return { data: this.data as T, count: this.count, error: null }
+  }
+
+  async maybeSingle<T>() {
+    const value = Array.isArray(this.data) ? this.data[0] : this.data
+    return { data: (value ?? null) as T | null, error: null }
   }
 
   then<TResult1 = unknown, TResult2 = never>(
@@ -208,28 +214,62 @@ describe('review candidate query', () => {
   })
 })
 
-describe('existing review pairs query', () => {
-  it('reads all statuses only within the bounded candidate set', async () => {
+describe('current review anchor query', () => {
+  it('reads the latest user or import entry for one owned thought', async () => {
     const query = new CapturingQuery([{
-      source_thought_id: ids.sourceThought,
-      target_thought_id: ids.targetThought,
+      id: ids.sourceEntry,
+      user_id: ids.user,
+      thought_id: ids.sourceThought,
+      client_request_id: ids.sourceEntry,
+      entry_type: 'user',
+      content: '最新补充',
+      source_label: null,
+      ai_action: null,
+      created_at: '2026-08-24T02:00:00.000Z',
     }])
+
+    await expect(new EntryRepository(clientFor(query, [])).latestUserEntry(
+      ids.user,
+      ids.sourceThought,
+    )).resolves.toMatchObject({ id: ids.sourceEntry, content: '最新补充' })
+
+    expect(query.calls).toContainEqual({ method: 'eq', args: ['user_id', ids.user] })
+    expect(query.calls).toContainEqual({ method: 'eq', args: ['thought_id', ids.sourceThought] })
+    expect(query.calls).toContainEqual({
+      method: 'in',
+      args: ['entry_type', ['user', 'import']],
+    })
+    expect(query.calls).toContainEqual({
+      method: 'order',
+      args: ['created_at', { ascending: false }],
+    })
+    expect(query.calls).toContainEqual({ method: 'limit', args: [1] })
+  })
+})
+
+describe('blocked review pairs query', () => {
+  it('reopens a rejected pair after either thought receives new content', async () => {
+    const query = new CapturingQuery([
+      {
+        source_thought_id: ids.sourceThought,
+        target_thought_id: ids.targetThought,
+        status: 'rejected',
+        decided_at: '2026-08-24T01:00:00.000Z',
+      },
+    ])
     const fromCalls: string[] = []
     const repository = new ThoughtConnectionRepository(clientFor(query, fromCalls))
 
-    await expect(repository.listExistingPairs(ids.user, [
-      ids.sourceThought,
-      ids.targetThought,
-      ids.sourceThought,
-      'invalid),status.eq.pending',
-    ])).resolves.toEqual([{
-      sourceThoughtId: ids.sourceThought,
-      targetThoughtId: ids.targetThought,
-    }])
+    await expect(repository.listBlockedPairs(ids.user, [
+      { thoughtId: ids.sourceThought, createdAt: '2026-08-24T00:00:00.000Z' },
+      { thoughtId: ids.targetThought, createdAt: '2026-08-24T02:00:00.000Z' },
+      { thoughtId: ids.sourceThought, createdAt: '2026-08-23T00:00:00.000Z' },
+      { thoughtId: 'invalid),status.eq.pending', createdAt: '2026-08-24T03:00:00.000Z' },
+    ])).resolves.toEqual([])
 
     expect(query.calls).toContainEqual({
       method: 'select',
-      args: ['source_thought_id, target_thought_id'],
+      args: ['source_thought_id, target_thought_id, status, decided_at'],
     })
     expect(query.calls).toContainEqual({ method: 'eq', args: ['user_id', ids.user] })
     expect(query.calls).toContainEqual({
@@ -245,13 +285,64 @@ describe('existing review pairs query', () => {
     expect(fromCalls).toEqual(['thought_connections'])
   })
 
+  it.each(['pending', 'confirmed'] as const)('keeps a %s pair blocked', async (status) => {
+    const query = new CapturingQuery([{
+      source_thought_id: ids.sourceThought,
+      target_thought_id: ids.targetThought,
+      status,
+      decided_at: status === 'confirmed' ? '2026-08-24T01:00:00.000Z' : null,
+    }])
+
+    await expect(new ThoughtConnectionRepository(clientFor(query, [])).listBlockedPairs(
+      ids.user,
+      [
+        { thoughtId: ids.sourceThought, createdAt: '2026-08-24T02:00:00.000Z' },
+        { thoughtId: ids.targetThought, createdAt: '2026-08-24T03:00:00.000Z' },
+      ],
+    )).resolves.toEqual([{
+      sourceThoughtId: ids.sourceThought,
+      targetThoughtId: ids.targetThought,
+    }])
+  })
+
   it('skips the database when fewer than two valid candidates remain', async () => {
     const query = new CapturingQuery([])
     const fromCalls: string[] = []
     const repository = new ThoughtConnectionRepository(clientFor(query, fromCalls))
 
-    await expect(repository.listExistingPairs(ids.user, [ids.sourceThought, 'invalid'])).resolves.toEqual([])
+    await expect(repository.listBlockedPairs(ids.user, [
+      { thoughtId: ids.sourceThought, createdAt: '2026-08-24T00:00:00.000Z' },
+      { thoughtId: 'invalid', createdAt: '2026-08-24T00:00:00.000Z' },
+    ])).resolves.toEqual([])
 
     expect(fromCalls).toEqual([])
+  })
+
+  it('blocks a rejected target until the just-saved content is newer than the decision', async () => {
+    const query = new CapturingQuery([{
+      source_thought_id: ids.sourceThought,
+      target_thought_id: ids.targetThought,
+      status: 'rejected',
+      decided_at: '2026-08-24T01:00:00.000Z',
+    }])
+    const repository = new ThoughtConnectionRepository(clientFor(query, []))
+
+    await expect(repository.listBlockedTargets(
+      ids.user,
+      ids.sourceThought,
+      '2026-08-24T01:00:00.000Z',
+    )).resolves.toEqual(new Set([ids.targetThought]))
+
+    const newerQuery = new CapturingQuery([{
+      source_thought_id: ids.sourceThought,
+      target_thought_id: ids.targetThought,
+      status: 'rejected',
+      decided_at: '2026-08-24T01:00:00.000Z',
+    }])
+    await expect(new ThoughtConnectionRepository(clientFor(newerQuery, [])).listBlockedTargets(
+      ids.user,
+      ids.sourceThought,
+      '2026-08-24T01:00:00.001Z',
+    )).resolves.toEqual(new Set())
   })
 })

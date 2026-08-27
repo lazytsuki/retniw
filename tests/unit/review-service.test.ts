@@ -42,10 +42,19 @@ function dependencies() {
       content: '目标原文',
       createdAt: '2026-08-23T01:00:00.000Z',
     })),
+    latestUserEntry: vi.fn().mockImplementation(async (_userId: string, thoughtId: string) => ({
+      id: thoughtId === ids.firstTarget ? ids.firstTargetEntry : ids.secondTargetEntry,
+      thoughtId,
+      entryType: 'user',
+      content: thoughtId === ids.firstTarget ? '旧摘要一' : '旧摘要二',
+      createdAt: thoughtId === ids.firstTarget
+        ? '2026-08-23T01:00:00.000Z'
+        : '2026-08-23T02:00:00.000Z',
+    })),
   }
   const connections = {
-    listExistingPairs: vi.fn().mockResolvedValue([]),
-    listExistingTargets: vi.fn().mockResolvedValue(new Set<string>()),
+    listBlockedPairs: vi.fn().mockResolvedValue([]),
+    listBlockedTargets: vi.fn().mockResolvedValue(new Set<string>()),
     createCandidate: vi.fn().mockResolvedValue({ connection: {}, created: true }),
   }
   const provider = {
@@ -85,7 +94,7 @@ describe('ReviewService', () => {
     })
 
     expect(deps.entries.claimForReview).not.toHaveBeenCalled()
-    expect(deps.connections.listExistingTargets).not.toHaveBeenCalled()
+    expect(deps.connections.listBlockedTargets).not.toHaveBeenCalled()
     expect(deps.thoughts.listReviewCandidates).not.toHaveBeenCalled()
     expect(deps.provider.findConnections).not.toHaveBeenCalled()
   })
@@ -110,7 +119,7 @@ describe('ReviewService', () => {
 
   it('uses only the saved entry, excludes existing pairs and persists anchored candidates', async () => {
     const deps = dependencies()
-    deps.connections.listExistingTargets.mockResolvedValue(new Set([ids.secondTarget]))
+    deps.connections.listBlockedTargets.mockResolvedValue(new Set([ids.secondTarget]))
     deps.thoughts.listReviewCandidates.mockResolvedValue([
       { id: ids.firstTarget, summary: '旧摘要一' },
     ])
@@ -123,7 +132,11 @@ describe('ReviewService', () => {
       created: 1,
     })
 
-    expect(deps.connections.listExistingTargets).toHaveBeenCalledWith(ids.user, ids.thought)
+    expect(deps.connections.listBlockedTargets).toHaveBeenCalledWith(
+      ids.user,
+      ids.thought,
+      processedThrough,
+    )
     expect(deps.thoughts.listReviewCandidates).toHaveBeenCalledWith(
       ids.user,
       ids.thought,
@@ -168,7 +181,7 @@ describe('ReviewService', () => {
     })
 
     expect(deps.thoughts.listReviewCorpus).not.toHaveBeenCalled()
-    expect(deps.connections.listExistingPairs).not.toHaveBeenCalled()
+    expect(deps.connections.listBlockedPairs).not.toHaveBeenCalled()
     expect(deps.provider.findConnectionPairs).not.toHaveBeenCalled()
   })
 
@@ -183,7 +196,7 @@ describe('ReviewService', () => {
       created: 0,
     })
 
-    expect(deps.connections.listExistingPairs).not.toHaveBeenCalled()
+    expect(deps.connections.listBlockedPairs).not.toHaveBeenCalled()
     expect(deps.provider.findConnectionPairs).not.toHaveBeenCalled()
   })
 
@@ -198,7 +211,7 @@ describe('ReviewService', () => {
       targetThoughtId: ids.firstTarget,
     }]
     deps.thoughts.listReviewCorpus.mockResolvedValue(corpus)
-    deps.connections.listExistingPairs.mockResolvedValue(existingPairs)
+    deps.connections.listBlockedPairs.mockResolvedValue(existingPairs)
 
     await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
       status: 'processed',
@@ -206,13 +219,16 @@ describe('ReviewService', () => {
     })
 
     expect(deps.thoughts.listReviewCorpus).toHaveBeenCalledWith(ids.user)
-    expect(deps.connections.listExistingPairs).toHaveBeenCalledWith(
+    expect(deps.connections.listBlockedPairs).toHaveBeenCalledWith(
       ids.user,
-      [ids.firstTarget, ids.secondTarget],
+      [
+        { thoughtId: ids.firstTarget, createdAt: '2026-08-23T01:00:00.000Z' },
+        { thoughtId: ids.secondTarget, createdAt: '2026-08-23T02:00:00.000Z' },
+      ],
     )
     expect(deps.provider.findConnectionPairs).toHaveBeenCalledWith(corpus, existingPairs)
-    expect(deps.entries.firstUserEntry).toHaveBeenCalledWith(ids.user, ids.firstTarget)
-    expect(deps.entries.firstUserEntry).toHaveBeenCalledWith(ids.user, ids.secondTarget)
+    expect(deps.entries.latestUserEntry).toHaveBeenCalledWith(ids.user, ids.firstTarget)
+    expect(deps.entries.latestUserEntry).toHaveBeenCalledWith(ids.user, ids.secondTarget)
     expect(deps.connections.createCandidate).toHaveBeenCalledWith({
       userId: ids.user,
       currentThoughtId: ids.firstTarget,
@@ -222,6 +238,38 @@ describe('ReviewService', () => {
       rationale: '两条旧想法都在处理同一个取舍',
     })
     expect(deps.entries.claimForReview).not.toHaveBeenCalled()
+  })
+
+  it('includes the latest user content in an explicit scan and anchors a resurfaced reason to it', async () => {
+    const deps = dependencies()
+    deps.entries.latestUserEntry.mockImplementation(async (_userId: string, thoughtId: string) => ({
+      id: thoughtId === ids.firstTarget ? ids.firstTargetEntry : ids.secondTargetEntry,
+      thoughtId,
+      entryType: 'user',
+      content: thoughtId === ids.firstTarget ? '忽略之后补充的新内容' : '旧摘要二',
+      createdAt: thoughtId === ids.firstTarget
+        ? '2026-08-24T03:00:00.000Z'
+        : '2026-08-23T02:00:00.000Z',
+    }))
+
+    await expect(new ReviewService(deps).scanExistingThoughts(ids.user)).resolves.toEqual({
+      status: 'processed',
+      created: 1,
+    })
+
+    expect(deps.provider.findConnectionPairs).toHaveBeenCalledWith([
+      {
+        id: ids.firstTarget,
+        summary: '原有内容：旧摘要一\n最新内容：忽略之后补充的新内容',
+      },
+      { id: ids.secondTarget, summary: '旧摘要二' },
+    ], [])
+    expect(deps.connections.createCandidate).toHaveBeenCalledWith(expect.objectContaining({
+      currentThoughtId: ids.firstTarget,
+      currentEntryId: ids.firstTargetEntry,
+      targetThoughtId: ids.secondTarget,
+      targetEntryId: ids.secondTargetEntry,
+    }))
   })
 
   it('keeps an explicit provider failure retryable without logging history text', async () => {

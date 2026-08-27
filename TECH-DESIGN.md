@@ -17,13 +17,15 @@
 | `user_review_preferences` | 隐私偏好 | 用户级回看开关默认关闭，跨设备同步，账号删除时级联清理 |
 | `entries.review_checked_at`、[`EntryRepository.claimForReview`](src/server/repositories/entry-repository.ts#claimForReview) | 回看认领 | 每条user/import entry独立原子认领；重复回调只处理一次，乱序回调互不覆盖 |
 | [`ThoughtConnectionRepository.listForReview`](src/server/repositories/thought-connection-repository.ts#listForReview)、[`countForReview`](src/server/repositories/thought-connection-repository.ts#countForReview) | 联系读取 | 四个精确外键内连接先过滤可见关系，再分页、计数并直接序列化 |
+| `product_events`、`POST /api/product-events` | 使用行为 | 固定记录工作区、回看、主动串联结果和联系原文打开事件；事件失败不阻断产品动作 |
+| [`scripts/report-product-metrics.mjs`](scripts/report-product-metrics.mjs) | 聚合指标 | 用户输入与导入分开统计，输出24小时首次用户输入、跨日继续、AI保存结果、回看和联系使用情况，不输出用户或内容标识 |
 | [`ThoughtRepository`](src/server/repositories/thought-repository.ts#ThoughtRepository)、[`ThoughtExportRepository`](src/server/repositories/thought-export-repository.ts#ThoughtExportRepository) | 生命周期与导出 | 删除物理执行；历史软删除行保持隐藏并从回看、合集和导出排除 |
 
 - 产品状态只分三层：用户原文是记录，AI产出的是联系候选，用户保留后才进入回看中的长期联系；不使用图数据库或回看快照表。
 - 当前想法中的“帮我接着想”和“整理”只在用户主动调用时使用当前想法；后台能力只负责跨想法比较，不生成正文、不续写、不分类。
 - 昵称保存在 Supabase Auth `user_metadata.nickname`中，是受限称呼标签，不进入关系匹配，也不能被当作提示词指令。
 - 回看默认关闭。后台任务先读取用户级开关，只有已开启才读取并发送必要的新旧用户原文；关闭后新保存不再触发比较。
-- `thought_connections`是唯一关系真相源；同一对想法沿用规范化顺序和唯一约束，任何既有`pending / confirmed / rejected`都会阻止重复候选。
+- `thought_connections`是唯一关系真相源；同一对想法沿用规范化顺序和唯一约束。`pending / confirmed`持续阻止重复候选；`rejected`在两端没有新增user/import entry时阻止重复候选，有新内容后可以复用原记录重新进入`pending`。
 - 归档是“以前的想法”的子视图，仍可参与跨想法比较；`deleted_at is not null`的历史行在所有产品读取中排除且不自动清理。
 - 新删除由`DELETE /api/thoughts/:id`物理执行，只命中`deleted_at is null`且属于当前用户的行；`PATCH`不再承担删除或恢复。
 - 保存后的回看使用 Next.js 16 `after()`；Vercel通过`waitUntil`延长函数生命周期，回调受路由`maxDuration`限制，因此失败只能降级为本次不产出候选，不能反向改变保存结果。每个user/import entry用自己的`review_checked_at`独立原子认领：同一entry重试只处理一次，不同entry即使回调乱序也各自处理。
@@ -106,9 +108,9 @@ flowchart TD
 
 - 需求/验收：用户不需要先新增一条内容，就能在回看中主动寻找既有想法之间的联系；当前想法AI仍只读当前内容。
 - 实现目标：`retniw-web`提供唯一显式入口，`retniw-api`复用既有候选和用户判断链路，不新增第二套关系模型或聊天上下文。
-- 实现：`POST /api/review/scan`先读取偏好，未开启时不读取历史；已开启时读取当前账号最多20条`deleted_at is null`、摘要来源为`user | import`的最近想法，可包含归档。只读取两端都位于本次候选集内、不限状态的既有关系对并排除后，单次调用`DeepSeekTextProvider.findConnectionPairs`，只接受候选集内最多3个不重复、非自连接、未出现过的想法对和每条不超过300字的依据。两端锚点均取各自首条user/import entry，持久化复用`ThoughtConnectionRepository.createCandidate`，结果只进入pending。
-- 相关符号：`ReviewWorkspace`、`POST /api/review/scan`、`ReviewService.scanExistingThoughts`、`ThoughtRepository.listReviewCorpus`、`ThoughtConnectionRepository.listExistingPairs`、`DeepSeekTextProvider.findConnectionPairs`
-- 验证入口：关闭状态不读历史、不调用模型；少于2条想法不调用模型；输入上限20条、每条500字、结果上限3条；未知ID、自连接、重复pair、既有pair和超长依据全部拒绝；供应商失败可重试且不记录正文；候选两端均能打开原文。
+- 实现：`POST /api/review/scan`先读取偏好，未开启时不读取历史；已开启时读取当前账号最多20条`deleted_at is null`、摘要来源为`user | import`的最近想法，可包含归档，并为每条想法补入最新user/import entry。`listBlockedPairs`持续排除`pending / confirmed`组合，以及两端最新内容都不晚于`decided_at`的`rejected`组合。单次调用`DeepSeekTextProvider.findConnectionPairs`，只接受候选集内最多3个不重复、非自连接、未被阻止的想法对和每条不超过300字的依据。两端使用各自最新user/import entry作为锚点，持久化复用`ThoughtConnectionRepository.createCandidate`，结果进入`pending`。
+- 相关符号：`ReviewWorkspace`、`POST /api/review/scan`、`ReviewService.scanExistingThoughts`、`ThoughtRepository.listReviewCorpus`、`EntryRepository.latestUserEntry`、`ThoughtConnectionRepository.listBlockedPairs`、`DeepSeekTextProvider.findConnectionPairs`
+- 验证入口：关闭状态不读历史、不调用模型；少于2条想法不调用模型；输入上限20条、每条500字、结果上限3条；未知ID、自连接、重复pair、受阻pair和超长依据全部拒绝；`rejected`组合在两端内容不变时受阻、有新内容时可重新判断；供应商失败可重试且不记录正文；候选两端均能打开原文。
 - 边界与不变约束：主动扫描不调用`claimForReview`，不消耗保存后处理的entry认领状态；不创建用户正文或AI正文，不自动确认关系，不读取AI摘要、已删除内容或其他账号内容。
 
 ### 后端与数据
@@ -141,19 +143,28 @@ flowchart TD
 
 - 需求/验收：开启后保存仍立即完成；最多生成三条有两端原文依据的候选，失败不影响保存和继续输入。
 - 实现目标：`retniw-api`，抽出ReviewService.processSavedEntry，让普通保存与模型处理只有“成功entry标识”这一条单向依赖。
-- 实现：当entry、touch和摘要步骤全部成功且类型为`user | import`时，无论本次entry是新建还是幂等重放，都在组装成功响应前调用`after(() => processSavedEntry({userId, thoughtId, entryId, processedThrough}))`；两个路由设置`maxDuration=60`。`processedThrough`只保留保存结果中的时间信息，不参与认领判断。后台先读偏好，关闭时立即返回；开启后调用`EntryRepository.claimForReview(userId, thoughtId, entryId)`，用`user_id + thought_id + id + entry_type in (user, import) + review_checked_at is null`一次更新并返回源entry。没有返回行表示同一entry已被处理、越权或属于AI entry，回调立即结束；不同entry各自拥有认领列，不受创建时间和`after()`到达顺序影响。认领成功后，以返回entry前2000字为源，以最多20个`deleted_at is null`且可含归档的thought首段摘要（每条最多500字）为候选；排除当前thought及任何已有关系对。排除集合只接受合法UUID，并在数据库查询中先执行`id not in (...)`再`limit 20`，避免已有关系占满召回窗口。DeepSeek超时45秒，只能返回候选集内0至3个target thought ID和每条不超过300字的依据；目标锚点取该thought首条user/import entry，持久化仍走`createCandidate`。
+- 实现：当entry、touch和摘要步骤全部成功且类型为`user | import`时，无论本次entry是新建还是幂等重放，都在组装成功响应前调用`after(() => processSavedEntry({userId, thoughtId, entryId, processedThrough}))`；两个路由设置`maxDuration=60`。`processedThrough`只保留保存结果中的时间信息，不参与认领判断。后台先读偏好，关闭时立即返回；开启后调用`EntryRepository.claimForReview(userId, thoughtId, entryId)`，用`user_id + thought_id + id + entry_type in (user, import) + review_checked_at is null`一次更新并返回源entry。没有返回行表示同一entry已被处理、越权或属于AI entry，回调立即结束；不同entry各自拥有认领列，不受创建时间和`after()`到达顺序影响。认领成功后，以返回entry前2000字为源，以最多20个`deleted_at is null`且可含归档的thought首段摘要（每条最多500字）为候选；排除当前thought、`pending / confirmed`组合，以及两端都没有忽略后新内容的`rejected`组合。排除集合只接受合法UUID，并在数据库查询中先执行`id not in (...)`再`limit 20`，避免受阻关系占满召回窗口。DeepSeek超时45秒，只能返回候选集内0至3个target thought ID和每条不超过300字的依据；目标锚点取该thought首条user/import entry，持久化仍走`createCandidate`。
 - 相关符号：`POST /api/thoughts`、`POST /api/thoughts/:id/entries`、`ReviewService.processSavedEntry`、`EntryRepository.claimForReview`、`DeepSeekTextProvider.findConnections`、`ThoughtRepository.listReviewCandidates`、`EntryRepository.firstUserEntry`
 - 验证入口：保存响应时间不包含模型等待；开关关闭不认领、不读取候选且不调用DeepSeek；同一entry幂等重放只认领一次，不同entry无论回调顺序都各认领一次，AI entry不可认领；归档可入选、软删除不可入选；0/1/3/越界/伪造ID模型结果；超时和供应商错误只留下服务端无正文错误记录。
 - 边界与不变约束：不增加队列、定时任务、向量库或第二模型；不发送AI entry、checkpoint、合集名、账号标识或其他账号内容；日志只记用户无关的结果码与耗时。
 
 #### 候选幂等、竞态与全局读取
 
-- 需求/验收：同一对想法忽略后不再出现，保留后可持续查看；并发保存不产生重复边。
+- 需求/验收：忽略收起当前理由，两端内容不变时不再出现，任一端新增user/import内容后可以重新判断；保留后持续可见；并发保存不产生重复边。
 - 实现目标：`retniw-api`，以entry级原子认领隔离后台回调，再复用thought_connections的规范化pair和三态完成关系幂等与批量列表。
-- 实现：[`ThoughtConnectionRepository.createCandidate`](src/server/repositories/thought-connection-repository.ts#ThoughtConnectionRepository)先规范化两端顺序，遇到既有pair或23505竞态时读取已有记录；`decide`只允许pending一次性进入confirmed/rejected。`EntryRepository.claimForReview`只在指定user/import entry的`review_checked_at`为空时写入当前时间并返回该行；同一entry重放或重复回调未命中，不同entry即使较新的回调先执行也不会阻止旧entry认领。`listExistingTargets`在模型调用前排除三种状态；多条候选逐条复用`createCandidate`。`listForReview(status, cursor)`通过四个精确外键`thought_connections_source_thought_owner_fk`、`thought_connections_target_thought_owner_fk`、`thought_connections_source_entry_owner_fk`和`thought_connections_target_entry_owner_fk`做`!inner`嵌入，在`limit 21`前过滤两端`deleted_at is null`及两端锚点`entry_type in (user, import)`，然后直接把嵌入行序列化为最多20条、每端最多1000字的页面数据，不再分页后补查或过滤。`countForReview`复用相同可见性查询并使用`count: exact, head: true`；API只在pending首屏请求该计数，confirmed或后续分页不重复计算。rejected不返回页面。
-- 相关符号：`EntryRepository.claimForReview`、`ThoughtConnectionRepository.listExistingTargets`、`createCandidate`、`listForReview`、`countForReview`、`GET /api/review`、`PATCH /api/thought-connections/:id`
-- 验证入口：开关关闭不认领；同entry幂等重放可以重复安排回调但只认领和调用模型一次；两个不同entry以任意顺序回调时均各自认领和处理一次；AI entry不可认领；同pair并发插入最多一行；在PostgREST集成环境验证四个精确FK嵌入与exact head计数；confirmed/rejected不能再次决定；删除任一端后列表和计数都不包含该关系。
-- 边界与不变约束：回看不是一次生成的报告，不保存页面快照；confirmed和pending继续随两端thought物理删除而级联清理。
+- 实现：[`ThoughtConnectionRepository.createCandidate`](src/server/repositories/thought-connection-repository.ts#ThoughtConnectionRepository)先规范化两端顺序，遇到既有pair或23505竞态时读取已有记录；`decide`只允许`pending`一次性进入`confirmed / rejected`。`listBlockedTargets`和`listBlockedPairs`持续阻止`pending / confirmed`组合；`rejected`只有在新锚点时间晚于`decided_at`时才可重新进入模型候选。模型给出候选后，`createCandidate`再次校验两端锚点，并拦截与上次文本相同的理由；符合条件时复用原pair ID，更新锚点、理由和建议时间，并以`status + decided_at`条件更新回到`pending`，不会覆盖并发进入的其他状态。`EntryRepository.claimForReview`继续保证同一entry只处理一次。`listForReview(status, cursor)`通过四个精确外键做`!inner`嵌入，在`limit 21`前过滤两端`deleted_at is null`及两端锚点`entry_type in (user, import)`，然后直接序列化最多20条、每端最多1000字的页面数据。`countForReview`复用相同可见性查询并使用`count: exact, head: true`；`rejected`不返回页面。
+- 相关符号：`EntryRepository.claimForReview`、`EntryRepository.latestUserEntry`、`ThoughtConnectionRepository.listBlockedTargets`、`listBlockedPairs`、`createCandidate`、`listForReview`、`countForReview`、`GET /api/review`、`PATCH /api/thought-connections/:id`
+- 验证入口：开关关闭不认领；同entry幂等重放只处理一次；AI entry不可认领；同pair并发插入最多一行；`rejected`在无新内容时保持关闭、有新内容时复用原行回到`pending`；`pending / confirmed`不被覆盖；删除任一端后列表和计数都不包含该关系。
+- 边界与不变约束：回看不是一次生成的报告，不保存页面快照；所有状态的关系都随两端thought物理删除而级联清理。
+
+#### 第一方使用行为
+
+- 需求/验收：能够区分进入工作区、打开回看、主动串联结果和从联系打开原文；行为记录失败不影响对应产品动作。
+- 实现：`VisibleProductEvent`在页面可见时发送`workspace_active_day / review_opened`；两者按`user_id + event_name + event_day`去重，`event_day`由`occurred_at`按`Asia/Shanghai`生成。`POST /api/review/scan`返回扫描结果后，通过Next `after()`记录固定`scan_status`和0至3的`created_count`。打开联系原文时发送`connection_opened`，服务端校验connection归属及thought属于该connection。扫描结果事件和原文打开事件使用`client_request_id`幂等。
+- 数据边界：`product_events`只包含固定事件字段，不接收自由JSON；正文、AI输入输出和账号资料不进入事件行。用户、thought或connection物理删除时，相应事件级联删除。
+- 聚合：`npm run metrics:product`读取必要标识、类型、状态和时间。24小时首次写入、跨日继续和同一thought追加只统计`user` entry；导入人数和导入段数单独统计。报告同时输出AI保存结果、checkpoint、回看与联系等聚合结果，不输出用户、thought或entry标识。
+- 相关符号：`ProductEventRepository`、`POST /api/product-events`、`VisibleProductEvent`、`recordConnectionOpened`、`scripts/report-product-metrics.mjs`
+- 验证入口：事件形状、用户归属、上海自然日去重、请求幂等、迁移缺失与0行区分、事件失败不阻断主流程、聚合结果不含输入标识。
 
 ### 数据库 DDL
 
@@ -168,6 +179,21 @@ alter table public.user_review_preferences enable row level security;
 
 alter table public.entries
   add column if not exists review_checked_at timestamptz null;
+
+create table public.product_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  event_name text not null,
+  occurred_at timestamptz not null default now(),
+  event_day date generated always as (
+    (occurred_at at time zone 'Asia/Shanghai')::date
+  ) stored,
+  client_request_id uuid,
+  thought_id uuid,
+  connection_id uuid,
+  scan_status text,
+  created_count smallint
+);
 ```
 
 ## 契约
@@ -204,7 +230,8 @@ type ReviewConnection = {
 - `PATCH /api/thoughts/:id`只执行`ThoughtAction`；`DELETE /api/thoughts/:id`成功204，非法ID 400，不存在、已软删除或非本人资源404，约束冲突409。
 - `GET /api/review?status=pending|confirmed&cursor=`返回`preference/connections/nextCursor`；默认pending，每页20条。`pendingCount`只在pending首屏返回，confirmed和带cursor的后续页省略，避免重复exact计数。
 - `PATCH /api/review/preference`只接受`{enabled:boolean}`，返回`ReviewPreference`；重复设置同值成功且更新时间不倒退。
-- `POST /api/review/scan`无请求体；偏好关闭返回`disabled`，少于2条可用想法返回`not-enough-content`，供应商失败返回可重试的`provider-failed`，候选持久化失败返回可重试的`persistence-failed`及已成功保存数，全部处理完成后返回`processed`及本次实际新增候选数。
+- `POST /api/review/scan`接受可选`{requestId:uuid}`作为事件幂等键；偏好关闭返回`disabled`，少于2条可用想法返回`not-enough-content`，供应商失败返回可重试的`provider-failed`，候选持久化失败返回可重试的`persistence-failed`及已成功保存数，全部处理完成后返回`processed`及本次实际新增候选数。
+- `POST /api/product-events`只接受`workspace_active_day`、`review_opened`和带`requestId / connectionId / thoughtId`的`connection_opened`；`review_scan_finished`只由扫描路由按服务端结果写入。
 - `PATCH /api/thought-connections/:id`沿用`{decision:'confirmed'|'rejected'}`；只有pending可决定，重复同一决定幂等成功，相反决定409。
 - 结构化导出继续只包含confirmed关系；thought、entry、checkpoint和connection查询都以未删除thought为集合边界。为兼容`retniw.export.v1`，`deletedAt`字段暂时保留但导出值只会为null。
 
@@ -212,11 +239,12 @@ type ReviewConnection = {
 
 - 指向`thoughts`的`entries`、`thought_checkpoints`和`thought_connections`外键必须使用`ON DELETE CASCADE`，且不能存在未纳入清理语义的其他子引用。不要用应用层多步删除绕过数据库原子性。仓库不包含基础数据表的完整初始化迁移，因此这里不写无法由仓库复现的约束名。
 - `after()`没有持久队列的重试保证；每条entry在模型调用前独立认领，同一entry的供应商失败不会自动重试，换来幂等重放不重复调用模型。不同entry不共享时间水位，回调乱序不会漏掉较早保存的entry。如果这一可靠性边界无法满足实际使用，再引入持久任务机制。
-- 保存后回看以源entry 2000字、20个thought摘要、每条摘要500字、最多3个结果限制模型输入和写放大；主动扫描以最多20个thought摘要、每条500字和最多3个pair为上限，并排除所有状态的既有pair。页面关系查询用内连接先过滤再取21条判定下一页并直接序列化20条，pending精确计数只发生在首屏。阈值调整不得改变默认关闭和原文锚点边界。
+- 保存后回看以源entry 2000字、20个thought摘要、每条摘要500字、最多3个结果限制模型输入和写放大；主动扫描以最多20个thought摘要与最新user/import entry、每条500字和最多3个pair为上限。`pending / confirmed`持续排除，`rejected`在任一端出现晚于决定时间的新内容后可重新判断。页面关系查询用内连接先过滤再取21条判定下一页并直接序列化20条，pending精确计数只发生在首屏。阈值调整不得改变默认关闭和原文锚点边界。
 - 首页、想法详情和回看页在服务端并行读取最近想法与合集；合集首读成功时不再水合后重复请求，首读失败时客户端只补拉一次。回看页同时并行读取偏好、pending首屏及计数、confirmed首屏，并随首个RSC响应下发，客户端只在首读失败、加载更多或操作后再请求接口。想法详情与回看路由使用各自的`loading.tsx`提供即时反馈；历史列表继续关闭全量视口预取，只在用户指向、聚焦或触摸某一条时预取该目标路由。
 - 关闭回看阻止关闭之后保存触发的新任务；已经进入DeepSeek调用的任务无法撤回已发送内容，但返回结果仍只形成pending候选，不会自动保留或改写内容，关闭前已有候选可继续处理。
 - 代码回退不会恢复已经物理删除的数据。历史软删除行必须继续保持隐藏，回退方案也要保留这一读取边界。
 - DeepSeek错误、超时和非法响应不得记录原文或供应商响应正文；用户页面不弹阻断提示，只在之后进入回看时看到真实候选状态。
+- `product_events`写入失败只记录固定事件名，不改变工作区、回看、扫描或原文跳转结果。
 
 ## 验证映射
 
@@ -233,7 +261,8 @@ type ReviewConnection = {
 | 确认后物理删除当前用户的可见想法及从属内容；历史软删除数据继续隐藏且不批量清理。 | `retniw-api`DELETE与未删除过滤 | 204/404/409、关联行、旧软删除ID和无清理脚本 | Repository/API测试、Supabase集成环境 |
 | 没有偏好记录和已有偏好记录都按同一默认值解释；明确开启和关闭随账号跨设备同步。 | `retniw-web`偏好控制；`retniw-api`偏好表 | 无偏好记录、已有偏好记录、重复提交、退出重登、第二设备读取 | API/UI测试、Supabase集成环境 |
 | 开启后保存仍立即完成；最多生成三条有两端原文依据的候选，失败不影响保存和继续输入。 | `retniw-api`after回调和ReviewService | 延迟45秒模型桩，0至3结果，模型失败时原文仍同步 | Route集成测试、浏览器Network |
-| 同一对想法忽略后不再出现，保留后可持续查看；并发保存不产生重复边。 | `retniw-api`entry认领与关系幂等；`retniw-web`回看 | 同entry重放只处理一次、不同entry在after逆序时各处理一次、AI entry不可认领、同pair并发、保留/忽略刷新 | Repository并发测试、Supabase集成环境、浏览器 |
+| 忽略后两端内容不变时不再出现，任一端新增原文后可以基于新依据重新判断；保留后持续可见。 | `retniw-api`entry认领、关系幂等与rejected条件更新；`retniw-web`回看 | 无新内容、有新内容、pending/confirmed保护、同pair并发、保留/忽略刷新 | Repository并发测试、Supabase集成环境、浏览器 |
+| 四类行为事件口径固定且不阻断产品动作，聚合结果不含用户或内容标识。 | `product_events`、事件API与聚合脚本 | 日去重、请求幂等、归属校验、固定字段、级联删除、迁移缺失、0行和聚合输出 | Schema、Repository、API、UI与聚合脚本测试 |
 | 回看列表、计数和候选召回先过滤再分页，不因无效关系或已有pair出现空页、漏项或重复重查。 | `retniw-api`四FK内连接、exact head计数、候选排除下推 | `!inner`过滤顺序、21/20分页、pending首屏计数、合法UUID排除后limit20 | Repository查询测试、PostgREST集成检查 |
 | 删除、回看和导出不泄露旧软删除或他人内容 | `retniw-api`所有权与未删除过滤 | 匿名401、跨账号404、旧软删除ID、导出内容和回看列表检查 | 自动测试、Supabase集成双账号夹具 |
 | 当前想法AI仍由用户主动调用且只读当前内容 | `retniw-web`当前工作区；`retniw-api`现有AI路由 | 未点击无请求，点击后请求上下文不含其他thought，回看开关互不影响 | AI route测试、浏览器Network |

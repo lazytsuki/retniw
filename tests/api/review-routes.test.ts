@@ -9,8 +9,15 @@ const mocks = vi.hoisted(() => ({
   countForReview: vi.fn(),
   decodeCursor: vi.fn(),
   scanExistingThoughts: vi.fn(),
+  recordScanFinished: vi.fn(),
+  scheduleAfter: vi.fn(),
+  afterCallbacks: [] as Array<() => void | Promise<void>>,
 }))
 
+vi.mock('next/server', async (importOriginal) => ({
+  ...await importOriginal<typeof import('next/server')>(),
+  after: mocks.scheduleAfter,
+}))
 vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
 vi.mock('@/src/lib/supabase/service', () => ({ createServiceClient: () => ({}) }))
 vi.mock('@/src/server/repositories/review-preference-repository', () => ({
@@ -33,6 +40,11 @@ vi.mock('@/src/server/review/review-service', () => ({
     }
   },
 }))
+vi.mock('@/src/server/repositories/product-event-repository', () => ({
+  ProductEventRepository: class {
+    recordScanFinished = mocks.recordScanFinished
+  },
+}))
 
 import { GET as getReview } from '@/app/api/review/route'
 import { PATCH as updatePreference } from '@/app/api/review/preference/route'
@@ -42,12 +54,17 @@ const userId = '018f6f3a-a1c2-47a8-8f1e-b00000000001'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.afterCallbacks.splice(0)
+  mocks.scheduleAfter.mockImplementation((callback: () => void | Promise<void>) => {
+    mocks.afterCallbacks.push(callback)
+  })
   mocks.requireUser.mockResolvedValue({ id: userId })
   mocks.getPreference.mockResolvedValue({ enabled: false, updatedAt: null })
   mocks.listForReview.mockResolvedValue({ connections: [], nextCursor: null })
   mocks.countForReview.mockResolvedValue(0)
   mocks.setPreference.mockResolvedValue({ enabled: true, updatedAt: '2026-08-24T01:00:00.000Z' })
   mocks.scanExistingThoughts.mockResolvedValue({ status: 'processed', created: 2 })
+  mocks.recordScanFinished.mockResolvedValue({ created: true })
 })
 
 describe('review routes', () => {
@@ -126,12 +143,46 @@ describe('review routes', () => {
   })
 
   it('starts an explicit existing-thought scan for the authenticated user', async () => {
-    const response = await scanExistingThoughts()
+    const requestId = '018f6f3a-a1c2-47a8-8f1e-b00000000002'
+    const response = await scanExistingThoughts(new NextRequest('http://localhost/api/review/scan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ requestId }),
+    }))
 
     expect(response.status).toBe(200)
     expect(mocks.scanExistingThoughts).toHaveBeenCalledWith(userId)
+    expect(mocks.recordScanFinished).not.toHaveBeenCalled()
+    expect(mocks.afterCallbacks).toHaveLength(1)
+    await mocks.afterCallbacks[0]()
+    expect(mocks.recordScanFinished).toHaveBeenCalledWith({
+      userId,
+      requestId,
+      status: 'processed',
+      created: 2,
+    })
     expect(await response.json()).toEqual({
       data: { status: 'processed', created: 2 },
     })
+  })
+
+  it('returns the scan result when event recording fails', async () => {
+    mocks.recordScanFinished.mockRejectedValue(new Error('write failed'))
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const response = await scanExistingThoughts(new NextRequest('http://localhost/api/review/scan', {
+      method: 'POST',
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.recordScanFinished).not.toHaveBeenCalled()
+    expect(await response.json()).toEqual({
+      data: { status: 'processed', created: 2 },
+    })
+    await mocks.afterCallbacks[0]()
+    expect(error).toHaveBeenCalledWith('product_event_failed', {
+      eventName: 'review_scan_finished',
+    })
+    error.mockRestore()
   })
 })

@@ -155,6 +155,22 @@ export class EntryRepository {
     return data ? toEntry(data) : null
   }
 
+  async latestUserEntry(userId: string, thoughtId: string) {
+    const { data, error } = await this.client
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('thought_id', thoughtId)
+      .in('entry_type', ['user', 'import'])
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle<EntryRecord>()
+
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read current review anchor')
+    return data ? toEntry(data) : null
+  }
+
   async findByClientRequest(userId: string, clientRequestId: string) {
     const { data, error } = await this.client
       .from('entries')

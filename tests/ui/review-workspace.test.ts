@@ -44,8 +44,11 @@ describe('cross-thought review workspace', () => {
     expect(workspace).toContain('开始串联')
     expect(workspace).toContain('关闭回看')
     expect(workspace).toContain("fetch('/api/review/preference'")
-    expect(workspace).toContain("fetch('/api/review/scan', { method: 'POST' })")
-    expect(workspace).toContain('最多20条最近想法的开头片段')
+    expect(workspace).toContain("fetch('/api/review/scan', {")
+    expect(workspace).toContain('scanRequestIdRef.current = createProductEventRequestId()')
+    expect(workspace).toContain('body: JSON.stringify({ requestId: scanRequestIdRef.current })')
+    expect(workspace).toContain('scanRequestIdRef.current = null')
+    expect(workspace).toContain('最多20条最近想法的开头和最新一段原文')
     expect(workspace).toContain('最多3条有依据的联系')
     expect(workspace).toContain('不改写，也不自动保留')
     expect(workspace).toContain('setEnabled(true, true)')
@@ -71,6 +74,9 @@ describe('cross-thought review workspace', () => {
     expect(workspace).toContain(": '保留'}")
     expect(workspace).toContain('>忽略<')
     expect(workspace).toContain('已保留')
+    expect(workspace).toContain("useVisibleProductEvent('review_opened')")
+    expect(workspace).toContain('recordConnectionOpened(connection.id, connection.source.thoughtId)')
+    expect(workspace).toContain('recordConnectionOpened(connection.id, connection.target.thoughtId)')
   })
 
   it('uses a restrained responsive layout without a forced glass treatment', async () => {

@@ -40,6 +40,18 @@ type ReviewConnectionQueryRecord = ThoughtConnectionRecord & {
   target_entry: ReviewAnchorRecord | ReviewAnchorRecord[]
 }
 
+type ExistingPairRecord = Pick<
+  ThoughtConnectionRecord,
+  'source_thought_id' | 'target_thought_id' | 'status' | 'decided_at'
+>
+
+type CandidateAnchorRecord = Pick<EntryRecord, 'id' | 'thought_id' | 'entry_type' | 'created_at'>
+
+export type ReviewContentAnchor = {
+  thoughtId: string
+  createdAt: string
+}
+
 const REVIEW_CONNECTION_SELECT = [
   'id',
   'user_id',
@@ -61,6 +73,17 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 function isUnwritableThoughtError(error: { code?: string; message?: string } | null) {
   return error?.code === 'P0001' && error.message?.startsWith('RETNIW_THOUGHT_')
+}
+
+function wasUpdatedAfterDecision(decidedAt: string | null, createdAt: string | undefined) {
+  if (!decidedAt || !createdAt) return false
+  const decisionTime = Date.parse(decidedAt)
+  const contentTime = Date.parse(createdAt)
+  return Number.isFinite(decisionTime) && Number.isFinite(contentTime) && contentTime > decisionTime
+}
+
+function normalizedRationale(value: string) {
+  return value.trim().replace(/\s+/g, ' ')
 }
 
 export class ThoughtConnectionRepository {
@@ -121,37 +144,137 @@ export class ThoughtConnectionRepository {
     return data
   }
 
-  async listExistingTargets(userId: string, thoughtId: string) {
+  async listBlockedTargets(userId: string, thoughtId: string, sourceEntryCreatedAt: string) {
     const { data, error } = await this.client
       .from('thought_connections')
-      .select('source_thought_id, target_thought_id')
+      .select('source_thought_id, target_thought_id, status, decided_at')
       .eq('user_id', userId)
       .or(`source_thought_id.eq.${thoughtId},target_thought_id.eq.${thoughtId}`)
-      .returns<Array<{ source_thought_id: string; target_thought_id: string }>>()
+      .returns<ExistingPairRecord[]>()
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read existing connections')
 
-    return new Set(data.map((record) => record.source_thought_id === thoughtId
-      ? record.target_thought_id
-      : record.source_thought_id))
+    return new Set(data.flatMap((record) => (
+      record.status === 'rejected' && wasUpdatedAfterDecision(record.decided_at, sourceEntryCreatedAt)
+        ? []
+        : [record.source_thought_id === thoughtId
+            ? record.target_thought_id
+            : record.source_thought_id]
+    )))
   }
 
-  async listExistingPairs(userId: string, candidateThoughtIds: readonly string[]) {
-    const candidateIds = Array.from(new Set(candidateThoughtIds.filter((id) => UUID_PATTERN.test(id))))
+  async listBlockedPairs(userId: string, anchors: readonly ReviewContentAnchor[]) {
+    const latestByThought = new Map<string, string>()
+    for (const anchor of anchors) {
+      if (!UUID_PATTERN.test(anchor.thoughtId) || !Number.isFinite(Date.parse(anchor.createdAt))) continue
+      const existing = latestByThought.get(anchor.thoughtId)
+      if (!existing || anchor.createdAt > existing) latestByThought.set(anchor.thoughtId, anchor.createdAt)
+    }
+    const candidateIds = Array.from(latestByThought.keys())
     if (candidateIds.length < 2) return []
 
     const { data, error } = await this.client
       .from('thought_connections')
-      .select('source_thought_id, target_thought_id')
+      .select('source_thought_id, target_thought_id, status, decided_at')
       .eq('user_id', userId)
       .in('source_thought_id', candidateIds)
       .in('target_thought_id', candidateIds)
-      .returns<Array<{ source_thought_id: string; target_thought_id: string }>>()
+      .returns<ExistingPairRecord[]>()
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read existing connection pairs')
 
-    return data.map((record) => ({
-      sourceThoughtId: record.source_thought_id,
-      targetThoughtId: record.target_thought_id,
-    }))
+    return data.flatMap((record) => {
+      const hasNewContent = record.status === 'rejected' && (
+        wasUpdatedAfterDecision(record.decided_at, latestByThought.get(record.source_thought_id)) ||
+        wasUpdatedAfterDecision(record.decided_at, latestByThought.get(record.target_thought_id))
+      )
+      return hasNewContent ? [] : [{
+        sourceThoughtId: record.source_thought_id,
+        targetThoughtId: record.target_thought_id,
+      }]
+    })
+  }
+
+  private async anchorsAllowResurface(
+    userId: string,
+    row: Pick<ThoughtConnectionRecord, 'source_thought_id' | 'target_thought_id' | 'source_entry_id' | 'target_entry_id'>,
+    decidedAt: string | null,
+  ) {
+    if (!decidedAt) return false
+    const { data, error } = await this.client
+      .from('entries')
+      .select('id, thought_id, entry_type, created_at')
+      .eq('user_id', userId)
+      .in('id', [row.source_entry_id, row.target_entry_id])
+      .in('entry_type', ['user', 'import'])
+      .returns<CandidateAnchorRecord[]>()
+    if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read connection anchors')
+
+    const entries = new Map(data.map((entry) => [entry.id, entry]))
+    const source = entries.get(row.source_entry_id)
+    const target = entries.get(row.target_entry_id)
+    if (
+      source?.thought_id !== row.source_thought_id ||
+      target?.thought_id !== row.target_thought_id
+    ) return false
+
+    return wasUpdatedAfterDecision(decidedAt, source.created_at) ||
+      wasUpdatedAfterDecision(decidedAt, target.created_at)
+  }
+
+  private async reuseExistingCandidate(
+    userId: string,
+    existing: ThoughtConnectionRecord,
+    row: Pick<
+      ThoughtConnectionRecord,
+      'source_thought_id' | 'target_thought_id' | 'source_entry_id' | 'target_entry_id' | 'rationale'
+    >,
+  ) {
+    const [active] = await this.withActiveThoughts(userId, [existing])
+    if (!active) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    if (active.status !== 'rejected') {
+      return {
+        connection: active.status === 'pending' ? await this.toView(userId, active) : null,
+        created: false,
+      }
+    }
+    if (!await this.anchorsAllowResurface(userId, row, active.decided_at)) {
+      return { connection: null, created: false }
+    }
+    if (normalizedRationale(row.rationale) === normalizedRationale(active.rationale)) {
+      return { connection: null, created: false }
+    }
+
+    const updated = await this.client
+      .from('thought_connections')
+      .update({
+        source_entry_id: row.source_entry_id,
+        target_entry_id: row.target_entry_id,
+        rationale: row.rationale,
+        status: 'pending',
+        decided_at: null,
+        created_at: new Date().toISOString(),
+      })
+      .eq('id', active.id)
+      .eq('user_id', userId)
+      .eq('status', 'rejected')
+      .eq('decided_at', active.decided_at!)
+      .select('*')
+      .maybeSingle<ThoughtConnectionRecord>()
+    if (isUnwritableThoughtError(updated.error)) {
+      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    }
+    if (updated.error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to save thought connection')
+    if (updated.data) {
+      return { connection: await this.toView(userId, updated.data), created: true }
+    }
+
+    const raced = await this.readPair(userId, row.source_thought_id, row.target_thought_id)
+    if (!raced) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought connection')
+    const [activeRaced] = await this.withActiveThoughts(userId, [raced])
+    if (!activeRaced) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+    return {
+      connection: activeRaced.status === 'pending' ? await this.toView(userId, activeRaced) : null,
+      created: false,
+    }
   }
 
   async createCandidate(input: {
@@ -174,12 +297,7 @@ export class ThoughtConnectionRepository {
     }
     const existing = await this.readPair(input.userId, input.currentThoughtId, input.targetThoughtId)
     if (existing) {
-      const [active] = await this.withActiveThoughts(input.userId, [existing])
-      if (!active) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
-      return {
-        connection: active.status === 'pending' ? await this.toView(input.userId, active) : null,
-        created: false,
-      }
+      return this.reuseExistingCandidate(input.userId, existing, row)
     }
 
     const inserted = await this.client
@@ -199,12 +317,7 @@ export class ThoughtConnectionRepository {
 
     const raced = await this.readPair(input.userId, input.currentThoughtId, input.targetThoughtId)
     if (!raced) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to read thought connection')
-    const [active] = await this.withActiveThoughts(input.userId, [raced])
-    if (!active) throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
-    return {
-      connection: active.status === 'pending' ? await this.toView(input.userId, active) : null,
-      created: false,
-    }
+    return this.reuseExistingCandidate(input.userId, raced, row)
   }
 
   async listForReview(

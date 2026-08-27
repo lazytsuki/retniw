@@ -7,6 +7,7 @@ import { updateNickname, type NicknameActionState } from '@/app/account/actions'
 import { logout } from '@/app/auth/actions'
 import type { AccountProfile } from '@/src/lib/auth/account-profile'
 import { useDismissibleLayer, useOverlayController } from './overlay-provider'
+import { VisibleProductEvent } from './product-event-sender'
 import { useWorkspaceSidebar } from './workspace-sidebar-provider'
 
 export function RetniwSymbol() {
@@ -69,6 +70,7 @@ export function AppHeader({ account }: { account?: AccountProfile }) {
 
   return (
     <header className={`app-header${sidebar.collapsed ? ' app-header--sidebar-collapsed' : ''}`}>
+      {account ? <VisibleProductEvent eventName="workspace_active_day" /> : null}
       <div className="app-header__sidebar">
         <div className="desktop-sidebar-brand">
           <span className="brand">
