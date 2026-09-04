@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | [`ThoughtNavigation`](src/components/thoughts/thought-navigation.tsx#ThoughtNavigation) | 工作区导航 | 最近内容为历史根；合集、归档、回看为次级入口；不提供已删除视图 |
 | `AppHeader`、`app/auth/created`、`app/account/actions.ts` | 账号入口 | 创建成功先进入轻量过渡页；顶栏回显邮箱并编辑昵称 |
-| [`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer) | 内容输入 | 初始记录与继续写复用同一组件，通过`data-mode`切换文案和可编辑表面强度 |
+| [`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer) | 内容输入 | 初始记录与继续写复用同一组件和容器视觉；`data-mode`只切换文案、标签与内部排版 |
 | `thought_outbox`、[`useCaptureOutbox`](src/hooks/use-capture-outbox.ts#useCaptureOutbox) | 本机保存 | 按`userId`隔离草稿和待同步内容；同一想法按创建顺序发送，旧版无归属记录需由当前用户确认后恢复 |
 | `x-retniw-expected-user-id`、`expectedUserId`、[`requireRequestUser`](src/lib/auth/require-user.ts#requireRequestUser) | 页面账号围栏 | 客户端读取和写入通过请求头携带页面账号；导出先用请求头预检，再通过同源查询参数保持浏览器原生流式下载。Cookie已切换时返回`AUTH_CONTEXT_CHANGED`，全局提示刷新，不读取或修改另一账号数据 |
 | [`ThoughtListItem`](src/components/thoughts/thought-list-item.tsx#ThoughtListItem)、[`ThoughtActionMenu`](src/components/thoughts/thought-action-menu.tsx#ThoughtActionMenu) | 内容管理 | 删除经强确认后调用 HTTP DELETE，不提供恢复 |
@@ -68,7 +68,7 @@ flowchart TD
 #### 桌面侧栏与移动抽屉
 
 - 需求/验收：收起侧栏后不保留随视口增长的空白；归档和回看不随列表滚出底部；桌面和移动端使用同一导航数据。
-- 实现：901像素以上的`.app-shell`铺满宽度；收起轨道宽52像素，与主区间距16像素，不使用`vw`间距。900像素以下保留最大732像素的居中内容和抽屉导航。
+- 实现：901像素以上的`.app-shell`铺满宽度；桌面主区使用同构五轨网格，收起轨道宽52像素，与主区间距16像素，通过同一缓动连续插值侧栏、间距和主区留白，不在动画途中切换对齐方式。900像素以下保留最大732像素的居中内容和抽屉导航；系统启用减少动态效果时立即完成切换。
 - 相关符号：`.app-shell`、`.app-header--sidebar-collapsed`、`.thought-layout--sidebar-collapsed`、`ThoughtNavigation`
 - 边界与不变约束：不在移动端渲染收起轨道；安全区内边距在两种布局中都保留。
 
@@ -266,11 +266,11 @@ type ReviewConnection = {
 | 需求/验收 | 设计落点 | 验证方式 | 证据/环境 |
 | --- | --- | --- | --- |
 | 创建账号后自动进入，顶栏回显邮箱并支持昵称。 | 认证过渡页、`AppHeader`、昵称Action和提示词边界 | 创建、自动进入、邮箱回显、昵称保存/清除/会话失效、恶意昵称 | Action和Provider测试；认证后浏览器 |
-| 侧栏展开/收起不留多余空白，移动端不渲染桌面窄轨。 | 桌面全宽外壳、52像素收起轨道、900像素分界 | 320、390、900、901、1440、1470像素；展开/收起及旋转 | UI测试与浏览器尺寸检查 |
+| 侧栏展开/收起不留多余空白，主区运动不反向或过冲，移动端不渲染桌面窄轨。 | 桌面全宽外壳、同构五轨网格、52像素收起轨道、900像素分界 | 320、390、900、901、1440、1470像素；逐帧检查展开/收起、快速反向、减少动态效果及旋转 | UI测试与浏览器尺寸、轨迹检查 |
 | 进入归档后不出现“全部”或“已删除”标签；取消归档后回到最近内容，合集归属不变。 | `retniw-web`历史根与归档 | 根、空归档、有内容归档、取消归档、移动面板回放 | Chromium与WebKit；320、375、1024、1440像素 |
 | 所有删除入口都先强提醒，确认后无法恢复，想法、内容和相关联系不可再读取。 | `retniw-web`删除交互；`retniw-api`DELETE | 四种入口、取消、单次提交、404/409、删除后深链和关联行检查 | 自动测试、Supabase集成环境、桌面与移动浏览器 |
 | 首次开启前说明处理范围；候选可回到两端原文，保留的联系可再次打开；页面不被理解为聊天。 | `retniw-web`独立回看；`retniw-api`全局关系读取 | 未开启、候选、已保留、两端深链、无输入框 | API/UI测试、Chromium与WebKit |
-| 用户能识别初始输入和继续写区域，不依赖低对比占位文字猜测入口。 | `retniw-web`共用ThoughtComposer的initial/continuation模式 | 空白页、详情页、聚焦态和键盘可访问性 | UI测试；320、390、620、900、1440像素浏览器 |
+| 用户能识别初始输入和继续写区域，两处容器与聚焦视觉一致，不依赖低对比占位文字猜测入口。 | `retniw-web`共用ThoughtComposer的initial/continuation模式和容器视觉 | 空白页、详情页、默认态、聚焦态和键盘可访问性 | UI测试；320、390、620、900、1440像素浏览器 |
 | 默认关闭，明确开启后才发送跨想法内容，关闭后新保存不再处理。 | `retniw-web`回看开关；`retniw-api`偏好表 | 无偏好记录和已有偏好记录的默认值、开启/关闭失败回滚、退出重登、第二设备读取 | Repository/API测试、Supabase集成环境 |
 | 不新增内容也能主动串联既有想法；失败可重试，结果仍由用户判断。 | `retniw-web`开始串联；`retniw-api`显式scan和既有pending链路 | 关闭、少于2条、0至3条、非法pair、供应商失败、重复扫描 | Service/API/UI测试；认证后浏览器验收 |
 | 确认后物理删除当前用户的可见想法及从属内容；历史软删除数据继续隐藏且不批量清理。 | `retniw-api`DELETE与未删除过滤 | 204/404/409、关联行、旧软删除ID和无清理脚本 | Repository/API测试、Supabase集成环境 |

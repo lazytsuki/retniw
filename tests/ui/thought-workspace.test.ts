@@ -68,8 +68,10 @@ describe('thought workspace acceptance boundaries', () => {
     const css = await readFile('src/index.css', 'utf8')
     expect(css).toContain('--workspace-sidebar-width: clamp(230px, 20vw, 280px)')
     expect(css).toContain('grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr)')
-    expect(css).toMatch(/\.thought-layout--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*gap: 16px;/)
-    expect(css).toMatch(/@media \(min-width: 901px\) \{\s*\.thought-layout--sidebar-collapsed \.thought-main \{\s*justify-self: center;\s*\}\s*\}/)
+    expect(css).toMatch(/\.thought-layout--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*--workspace-sidebar-gap: 16px;[\s\S]*--workspace-main-leading: 1fr;/)
+    expect(css).toMatch(/@media \(min-width: 901px\) \{[\s\S]*grid-template-columns:[\s\S]*var\(--workspace-main-leading\)[\s\S]*var\(--thought-main-max-width\)[\s\S]*\.thought-main \{[\s\S]*grid-column: 4;/)
+    expect(css).toContain('--workspace-motion-easing: cubic-bezier(0.22, 1, 0.36, 1)')
+    expect(css).not.toMatch(/\.thought-layout--sidebar-collapsed \.thought-main \{[\s\S]*justify-self/)
     expect(css).toMatch(/\.app-header--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*column-gap: 16px;/)
     expect(css).toMatch(/@media \(min-width: 901px\)[\s\S]*\.app-header \{[\s\S]*position: sticky/)
     expect(css).toMatch(/\.thought-sidebar \{[\s\S]*top: calc\(48px \+ var\(--thought-sidebar-top\)\)/)
@@ -192,13 +194,17 @@ describe('thought workspace acceptance boundaries', () => {
     expect(composer).toContain("window.matchMedia('(pointer: coarse)').matches")
     expect(composer).toContain("thought-composer--initial")
     expect(composer).toContain("data-mode={hasEntries ? 'continuation' : 'initial'}")
+    expect(composer).toContain('usePointerGlow<HTMLDivElement>()')
+    expect(composer).toContain('data-pointer-glow="capture"')
     expect(composer).toContain('>继续写</label>')
     expect(composer).toContain('补充一个新的点，或继续刚才的思路')
     expect(composer).toContain('换行继续写，点箭头保存')
     expect(css).toMatch(/@media \(pointer: coarse\)[\s\S]*\.capture-shortcut-hint \{[\s\S]*display: none;[\s\S]*\.capture-mobile-hint \{[\s\S]*display: inline;/)
     expect(css.match(/\.capture-mobile-hint \{\s*display: inline;/g)).toHaveLength(1)
-    expect(css).toMatch(/\.thought-composer\[data-mode="continuation"\] \{[\s\S]*border-color: rgb\(255 255 255 \/ 20%\)/)
-    expect(css).toMatch(/@media \(max-width: 560px\)[\s\S]*\.thought-composer--initial,[\s\S]*border-color: rgb\(255 255 255 \/ 16%\)/)
+    expect(css).not.toMatch(/\.thought-composer\[data-mode="continuation"\] \{[\s\S]*?(?:border-color|background|box-shadow):/)
+    expect(css).not.toContain('.thought-composer[data-mode="continuation"]:focus-within')
+    expect(css).toMatch(/@media \(max-width: 560px\)[\s\S]*\.thought-composer,[\s\S]*border-color: rgb\(255 255 255 \/ 16%\)/)
+    expect(css).not.toMatch(/\.thought-composer--initial(?:,|:focus-within)[^{]*\{[\s\S]*?(?:border-color|background|box-shadow):/)
     expect(css).toMatch(/\.thought-composer--initial textarea \{[\s\S]*min-height: clamp\(280px, 50dvh, 520px\)/)
     expect(css).not.toMatch(/\.thought-composer \{[\s\S]*position: fixed/)
   })
@@ -248,12 +254,11 @@ describe('thought workspace acceptance boundaries', () => {
 
   it('scrolls only the desktop history body and keeps secondary actions fixed', async () => {
     const css = await readFile('src/index.css', 'utf8')
-    const sidebarRule = css.match(/\.thought-sidebar \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    const sidebarRules = [...css.matchAll(/\.thought-sidebar \{([\s\S]*?)\n\}/g)].map((match) => match[1])
     const scrollRule = css.match(/\.thought-navigation__scroll \{([\s\S]*?)\n\}/)?.[1] ?? ''
     const footerRule = css.match(/\.thought-navigation__footer \{([\s\S]*?)\n\}/)?.[1] ?? ''
     const shellRule = css.match(/\.app-shell \{([\s\S]*?)\n\}/)?.[1] ?? ''
-    expect(sidebarRule).toContain('flex-direction: column')
-    expect(sidebarRule).toContain('overflow: visible')
+    expect(sidebarRules.some((rule) => rule.includes('flex-direction: column') && rule.includes('overflow: visible'))).toBe(true)
     expect(scrollRule).toContain('min-height: 0')
     expect(scrollRule).toContain('overflow-x: hidden')
     expect(scrollRule).toContain('overflow-y: auto')

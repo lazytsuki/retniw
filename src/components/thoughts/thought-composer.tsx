@@ -36,13 +36,13 @@ export function shouldSubmitThought(event: {
 export function ThoughtComposer({ autoFocus = false, content, disabled = false, saveDisabled = false, hasEntries, onChange, onSubmit, textareaRef }: ThoughtComposerProps) {
   const copy = thoughtComposerCopy(hasEntries)
   const textareaId = useId()
-  const pointerGlow = usePointerGlow<HTMLDivElement>(!hasEntries)
+  const pointerGlow = usePointerGlow<HTMLDivElement>()
   return (
     <div
       className={`thought-composer capture-surface${hasEntries ? '' : ' thought-composer--initial'}`}
       aria-busy={disabled || undefined}
       data-mode={hasEntries ? 'continuation' : 'initial'}
-      data-pointer-glow={hasEntries ? undefined : 'capture'}
+      data-pointer-glow="capture"
       onPointerLeave={pointerGlow.onPointerLeave}
       onPointerMove={pointerGlow.onPointerMove}
     >

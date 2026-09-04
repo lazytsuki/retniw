@@ -12,6 +12,8 @@
   --text-secondary: rgb(245 245 243 / 72%);
   --text-muted: rgb(245 245 243 / 58%);
   --text-subtle: rgb(245 245 243 / 55%);
+  --workspace-motion-duration: 280ms;
+  --workspace-motion-easing: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * {
@@ -156,6 +158,9 @@ a {
   align-items: center;
   height: 48px;
   padding-top: 20px;
+  transition:
+    grid-template-columns var(--workspace-motion-duration) var(--workspace-motion-easing),
+    column-gap var(--workspace-motion-duration) var(--workspace-motion-easing);
 }
 
 @media (min-width: 901px) {
@@ -179,7 +184,7 @@ a {
   width: var(--workspace-sidebar-width);
   min-width: 0;
   align-items: center;
-  transition: width 180ms ease;
+  transition: width var(--workspace-motion-duration) var(--workspace-motion-easing);
 }
 
 .desktop-sidebar-brand {
@@ -673,30 +678,48 @@ a.fragment-card:hover {
 .thought-layout {
   --thought-layout-top: clamp(38px, 6vh, 72px);
   --thought-sidebar-top: 32px;
+  --thought-main-max-width: 820px;
   --workspace-sidebar-width: clamp(230px, 20vw, 280px);
+  --workspace-sidebar-gap: clamp(48px, 7vw, 104px);
+  --workspace-main-leading: 0fr;
   display: grid;
   grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr);
-  gap: clamp(48px, 7vw, 104px);
+  gap: var(--workspace-sidebar-gap);
   align-items: start;
   padding-top: var(--thought-sidebar-top);
-  transition: grid-template-columns 180ms ease, gap 180ms ease;
 }
 
 .thought-layout--sidebar-collapsed {
   --workspace-sidebar-width: 52px;
-  gap: 16px;
+  --workspace-sidebar-gap: 16px;
+  --workspace-main-leading: 1fr;
 }
 
 .thought-main {
   width: 100%;
   min-width: 0;
-  max-width: 820px;
+  max-width: var(--thought-main-max-width);
   padding-top: calc(var(--thought-layout-top) - var(--thought-sidebar-top));
 }
 
 @media (min-width: 901px) {
-  .thought-layout--sidebar-collapsed .thought-main {
-    justify-self: center;
+  .thought-layout {
+    grid-template-columns:
+      var(--workspace-sidebar-width)
+      var(--workspace-sidebar-gap)
+      minmax(0, var(--workspace-main-leading))
+      minmax(0, var(--thought-main-max-width))
+      minmax(0, 1fr);
+    gap: 0;
+    transition: grid-template-columns var(--workspace-motion-duration) var(--workspace-motion-easing);
+  }
+
+  .thought-sidebar {
+    grid-column: 1;
+  }
+
+  .thought-main {
+    grid-column: 4;
   }
 }
 
@@ -1685,17 +1708,6 @@ a.fragment-card:hover {
 
 .thought-composer textarea {
   min-height: 190px;
-}
-
-.thought-composer[data-mode="continuation"] {
-  border-color: rgb(255 255 255 / 20%);
-  background: linear-gradient(145deg, rgb(255 255 255 / 10%), transparent 46%), rgb(20 24 26 / 90%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 9%), 0 22px 64px rgb(0 0 0 / 26%);
-}
-
-.thought-composer[data-mode="continuation"]:focus-within {
-  border-color: rgb(191 216 208 / 46%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 11%), 0 0 0 2px rgb(191 216 208 / 8%), 0 28px 76px rgb(0 0 0 / 34%);
 }
 
 .thought-composer__label {
@@ -3026,8 +3038,8 @@ a.fragment-card:hover {
     padding: 16px 18px 0;
   }
 
-  .thought-composer--initial,
-  .thought-composer--initial:focus-within {
+  .thought-composer,
+  .thought-composer:focus-within {
     overflow: hidden;
     border-color: rgb(255 255 255 / 16%);
     border-radius: 19px;
@@ -3035,7 +3047,7 @@ a.fragment-card:hover {
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
   }
 
-  .thought-composer--initial:focus-within {
+  .thought-composer:focus-within {
     border-color: rgb(191 216 208 / 38%);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%), 0 0 0 2px rgb(191 216 208 / 7%);
   }
