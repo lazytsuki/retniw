@@ -25,6 +25,7 @@ const previousState: NicknameActionState = {
 function nicknameForm(value: string) {
   const form = new FormData()
   form.set('nickname', value)
+  form.set('expectedUserId', 'owner')
   return form
 }
 
@@ -64,6 +65,18 @@ describe('updateNickname', () => {
 
     expect(mocks.updateUser).toHaveBeenCalledWith({ data: { nickname: null } })
     expect(result).toEqual({ status: 'success', message: '昵称已清除。', nickname: null })
+  })
+
+  it('does not update a different account after another tab switches the session', async () => {
+    const form = nicknameForm('Winter')
+    form.set('expectedUserId', 'previous-owner')
+
+    await expect(updateNickname(previousState, form)).resolves.toMatchObject({
+      status: 'error',
+      message: '账号已在其他页面切换，请刷新后继续。',
+      nickname: 'Before',
+    })
+    expect(mocks.updateUser).not.toHaveBeenCalled()
   })
 
   it('returns an explicit state when authentication, update or refresh fails', async () => {

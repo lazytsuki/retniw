@@ -18,7 +18,11 @@ const mocks = vi.hoisted(() => ({
   scheduleSavedEntryReview: vi.fn(),
 }))
 
-vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
+vi.mock('@/src/lib/auth/require-user', () => ({
+  requireMutationUser: mocks.requireUser,
+  requireRequestUser: mocks.requireUser,
+  requireUser: mocks.requireUser,
+}))
 vi.mock('@/src/lib/supabase/service', () => ({ createServiceClient: () => ({}) }))
 vi.mock('@/src/components/app-header', () => ({ AppHeader: () => null }))
 vi.mock('@/src/components/thoughts/thought-workspace', () => ({ ThoughtWorkspace: () => null }))

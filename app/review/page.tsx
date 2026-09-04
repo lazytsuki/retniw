@@ -46,10 +46,11 @@ export default async function ReviewPage() {
   ])
 
   return (
-    <main className="app-shell">
-      <AppHeader account={{ email: user.email, nickname: user.nickname }} />
+    <main className="app-shell" id="main-content" tabIndex={-1} data-retniw-user-id={userId}>
+      <AppHeader account={{ email: user.email, nickname: user.nickname }} userId={userId} />
       <ThoughtLayout>
         <ThoughtNavigation
+          userId={userId}
           activeThoughtId=""
           activeView="review"
           currentStarted
@@ -58,7 +59,7 @@ export default async function ReviewPage() {
           thoughts={recent.thoughts}
         />
         <section className="thought-main" aria-label="回看以前的想法">
-          <ReviewWorkspace initialData={initialReview} />
+          <ReviewWorkspace initialData={initialReview} userId={userId} />
         </section>
       </ThoughtLayout>
     </main>

@@ -10,6 +10,8 @@ import {
 } from '@/src/components/product-event-sender'
 import type { ReviewPreference } from '@/src/server/repositories/review-preference-repository'
 import type { ReviewConnection } from '@/src/server/repositories/thought-connection-repository'
+import { usePointerGlow } from '@/src/hooks/use-pointer-glow'
+import { userBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 
 type ReviewResponse = {
   data?: {
@@ -49,10 +51,10 @@ function mergeConnections(current: ReviewConnection[], additional: ReviewConnect
   ))
 }
 
-async function readList(status: 'pending' | 'confirmed', cursor?: string | null) {
+async function readList(userId: string, status: 'pending' | 'confirmed', cursor?: string | null) {
   const params = new URLSearchParams({ status })
   if (cursor) params.set('cursor', cursor)
-  const response = await fetch(`/api/review?${params.toString()}`)
+  const response = await userBoundFetch(userId, `/api/review?${params.toString()}`)
   const payload = await response.json().catch(() => null) as ReviewResponse | null
   if (!response.ok || !payload?.data?.preference || !payload.data.connections) {
     throw new Error('LOAD_FAILED')
@@ -80,21 +82,31 @@ function ArrowMark() {
 
 function ConnectionCard({
   connection,
+  disabled,
   deciding,
   onDecide,
 }: {
   connection: ReviewConnection
+  disabled?: boolean
   deciding: boolean
   onDecide?: (decision: 'confirmed' | 'rejected') => void
 }) {
+  const pointerGlow = usePointerGlow<HTMLElement>()
   return (
-    <article className={styles.card}>
+    <article
+      className={styles.card}
+      data-connection-id={connection.id}
+      data-pointer-glow="connection"
+      onPointerLeave={pointerGlow.onPointerLeave}
+      onPointerMove={pointerGlow.onPointerMove}
+    >
       <p className={styles.reason}><ConnectionMark />{connection.rationale}</p>
       <div className={styles.pair}>
         <div>
           <span>后来写的</span>
           <p>{connection.source.excerpt}</p>
           <Link
+            aria-label="打开后来写的原文"
             href={`/thoughts/${connection.source.thoughtId}#entry-${connection.source.entryId}`}
             onClick={() => recordConnectionOpened(connection.id, connection.source.thoughtId)}
           >
@@ -105,6 +117,7 @@ function ConnectionCard({
           <span>更早写的</span>
           <p>{connection.target.excerpt}</p>
           <Link
+            aria-label="打开更早写的原文"
             href={`/thoughts/${connection.target.thoughtId}#entry-${connection.target.entryId}`}
             onClick={() => recordConnectionOpened(connection.id, connection.target.thoughtId)}
           >
@@ -114,17 +127,17 @@ function ConnectionCard({
       </div>
       {onDecide ? (
         <div className={styles.actions}>
-          <button type="button" disabled={deciding} onClick={() => onDecide('confirmed')}>
+          <button data-decision="confirmed" type="button" disabled={disabled} onClick={() => onDecide('confirmed')}>
             {deciding ? '正在保存' : '保留'}
           </button>
-          <button type="button" disabled={deciding} onClick={() => onDecide('rejected')}>忽略</button>
+          <button data-decision="rejected" type="button" disabled={disabled} onClick={() => onDecide('rejected')}>忽略</button>
         </div>
       ) : null}
     </article>
   )
 }
 
-export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialData | null }) {
+export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewInitialData | null; userId: string }) {
   useVisibleProductEvent('review_opened')
   const [preference, setPreference] = useState<ReviewPreference | null>(initialData?.preference ?? null)
   const [pending, setPending] = useState<ListState>(initialData?.pending ?? emptyList)
@@ -133,21 +146,27 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState<'pending' | 'confirmed' | null>(null)
   const [preferencePending, setPreferencePending] = useState(false)
+  const [preferenceAction, setPreferenceAction] = useState<'enabling' | 'disabling' | null>(null)
   const [scanning, setScanning] = useState(false)
   const [decidingId, setDecidingId] = useState<string | null>(null)
   const [message, setMessage] = useState(initialData ? '' : '没有加载完成，可以重试。')
   const [notice, setNotice] = useState('')
   const preferencePendingRef = useRef(false)
   const scanningRef = useRef(false)
+  const decidingRef = useRef(false)
+  const loadingMoreRef = useRef(false)
   const scanRequestIdRef = useRef<string | null>(null)
+  const primaryActionRef = useRef<HTMLButtonElement>(null)
+  const pendingListRef = useRef<HTMLDivElement>(null)
+  const pendingHeadingRef = useRef<HTMLHeadingElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setMessage('')
     try {
       const [pendingData, confirmedData] = await Promise.all([
-        readList('pending'),
-        readList('confirmed'),
+        readList(userId, 'pending'),
+        readList(userId, 'confirmed'),
       ])
       setPreference(pendingData.preference!)
       setPending({
@@ -164,19 +183,18 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [userId])
 
   async function setEnabled(enabled: boolean, scanAfter = false) {
-    if (!preference || preferencePendingRef.current) return
-    const previous = preference
+    if (!preference || preferencePendingRef.current || scanningRef.current || decidingRef.current || loadingMoreRef.current) return
     let saved = false
     preferencePendingRef.current = true
-    setPreference({ ...preference, enabled })
     setPreferencePending(true)
+    setPreferenceAction(enabled ? 'enabling' : 'disabling')
     setMessage('')
     setNotice('')
     try {
-      const response = await fetch('/api/review/preference', {
+      const response = await userBoundFetch(userId, '/api/review/preference', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -186,17 +204,20 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
       setPreference(payload.data.preference)
       saved = true
     } catch {
-      setPreference(previous)
       setMessage('没有保存，可以重试。')
     } finally {
       preferencePendingRef.current = false
       setPreferencePending(false)
+      setPreferenceAction(null)
+    }
+    if (saved && !enabled) {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => primaryActionRef.current?.focus()))
     }
     if (saved && enabled && scanAfter) await scanExistingThoughts()
   }
 
   async function scanExistingThoughts() {
-    if (scanningRef.current) return
+    if (preferencePendingRef.current || scanningRef.current || decidingRef.current || loadingMoreRef.current) return
     scanningRef.current = true
     setScanning(true)
     setMessage('')
@@ -205,7 +226,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
       if (!scanRequestIdRef.current) {
         scanRequestIdRef.current = createProductEventRequestId()
       }
-      const response = await fetch('/api/review/scan', {
+      const response = await userBoundFetch(userId, '/api/review/scan', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ requestId: scanRequestIdRef.current }),
@@ -214,7 +235,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
       if (!response.ok || !payload?.data?.status) throw new Error('SCAN_FAILED')
       scanRequestIdRef.current = null
       if (payload.data.status === 'disabled') {
-        setMessage('先开启回看，再开始串联。')
+        setMessage('先开启自动串联，再开始串联。')
         return
       }
       if (payload.data.status === 'provider-failed') {
@@ -245,9 +266,12 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
   }
 
   async function decide(connection: ReviewConnection, decision: 'confirmed' | 'rejected') {
-    if (decidingId) return
+    if (preferencePendingRef.current || scanningRef.current || decidingRef.current || loadingMoreRef.current) return
     const previousPending = pending
     const previousPendingCount = pendingCount
+    const currentIndex = pending.items.findIndex((item) => item.id === connection.id)
+    const nextFocusId = pending.items[currentIndex + 1]?.id ?? pending.items[currentIndex - 1]?.id
+    decidingRef.current = true
     setDecidingId(connection.id)
     setMessage('')
     setPending((current) => ({
@@ -255,33 +279,68 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
       items: current.items.filter((item) => item.id !== connection.id),
     }))
     setPendingCount((current) => Math.max(0, current - 1))
+    window.requestAnimationFrame(() => {
+      const nextCard = nextFocusId
+        ? pendingListRef.current?.querySelector<HTMLElement>(`[data-connection-id="${nextFocusId}"]`)
+        : null
+      const nextAction = nextCard?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+      if (nextAction) nextAction.focus()
+      else if (pendingHeadingRef.current) pendingHeadingRef.current.focus()
+      else primaryActionRef.current?.focus()
+    })
+    let saved = false
     try {
-      const response = await fetch(`/api/thought-connections/${connection.id}`, {
+      const response = await userBoundFetch(userId, `/api/thought-connections/${connection.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ decision }),
       })
       if (!response.ok) throw new Error('DECIDE_FAILED')
-      if (decision === 'confirmed') {
-        const data = await readList('confirmed')
-        setConfirmed({ items: data.connections!, nextCursor: data.nextCursor ?? null })
-      }
+      saved = true
     } catch {
       setPending(previousPending)
       setPendingCount(previousPendingCount)
       setMessage('没有保存，可以重试。')
-    } finally {
-      setDecidingId(null)
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        pendingListRef.current
+          ?.querySelector<HTMLButtonElement>(
+            `[data-connection-id="${connection.id}"] button[data-decision="${decision}"]`,
+          )
+          ?.focus({ preventScroll: true })
+      }))
+    }
+
+    if (saved && decision === 'confirmed') {
+      try {
+        const data = await readList(userId, 'confirmed')
+        setConfirmed({ items: data.connections!, nextCursor: data.nextCursor ?? null })
+      } catch {
+        setMessage('联系已保留，但列表没有刷新；刷新页面即可看到。')
+      }
+    }
+    decidingRef.current = false
+    setDecidingId(null)
+    if (saved) {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const nextCard = nextFocusId
+          ? pendingListRef.current?.querySelector<HTMLElement>(`[data-connection-id="${nextFocusId}"]`)
+          : null
+        const nextAction = nextCard?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+        if (nextAction) nextAction.focus({ preventScroll: true })
+        else if (pendingHeadingRef.current) pendingHeadingRef.current.focus({ preventScroll: true })
+        else primaryActionRef.current?.focus({ preventScroll: true })
+      }))
     }
   }
 
   async function loadMore(status: 'pending' | 'confirmed') {
     const state = status === 'pending' ? pending : confirmed
-    if (!state.nextCursor || loadingMore) return
+    if (!state.nextCursor || preferencePendingRef.current || scanningRef.current || decidingRef.current || loadingMoreRef.current) return
+    loadingMoreRef.current = true
     setLoadingMore(status)
     setMessage('')
     try {
-      const data = await readList(status, state.nextCursor)
+      const data = await readList(userId, status, state.nextCursor)
       const update = (current: ListState): ListState => ({
         items: mergeConnections(current.items, data.connections!),
         nextCursor: data.nextCursor ?? null,
@@ -291,6 +350,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
     } catch {
       setMessage('没有加载完成，可以重试。')
     } finally {
+      loadingMoreRef.current = false
       setLoadingMore(null)
     }
   }
@@ -318,8 +378,8 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
           <h1 id="review-title">回看</h1>
         </div>
         {preference.enabled ? (
-          <button type="button" disabled={preferencePending} onClick={() => void setEnabled(false)}>
-            {preferencePending ? '正在保存' : '关闭回看'}
+          <button type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void setEnabled(false)}>
+            {preferenceAction === 'disabling' ? '正在暂停' : '暂停自动串联'}
           </button>
         ) : null}
       </header>
@@ -327,24 +387,26 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
       <div className={styles.intro} aria-busy={scanning || undefined}>
         <ConnectionMark />
         <h2>串联已有想法</h2>
-        <p>
+        <p id="review-intro-description">
           {preference.enabled
-            ? '把最多20条最近想法的开头和最新一段原文交给DeepSeek，找出最多3条有依据的联系。结果先由你判断，不改写，也不自动保留。'
+            ? '自动串联已开启。以后保存新内容时，会把最多20条最近想法的开头和最新一段原文交给DeepSeek，找出最多3条有依据的联系。结果先由你判断，不改写，也不自动保留。'
             : '开启后，会先把最多20条最近想法的开头和最新一段原文交给DeepSeek，找出最多3条有依据的联系；以后保存新内容时也会继续找。结果先由你判断，不改写，也不自动保留。'}
         </p>
         <button
+          ref={primaryActionRef}
           type="button"
-          disabled={preferencePending || scanning}
+          aria-describedby="review-intro-description"
+          disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null}
           onClick={() => preference.enabled
             ? void scanExistingThoughts()
             : void setEnabled(true, true)}
         >
           {preferencePending
-            ? '正在开启'
+            ? preferenceAction === 'disabling' ? '正在暂停' : '正在开启'
             : scanning
               ? '正在串联'
               : preference.enabled
-                ? '开始串联'
+                ? '再串联一次'
                 : '开启并开始串联'}
         </button>
       </div>
@@ -354,14 +416,15 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
 
       {(preference.enabled || hasReviewContent) ? <section className={styles.listSection} aria-labelledby="pending-title">
         <div className={styles.sectionHeading}>
-          <h2 id="pending-title">等你判断</h2>
+          <h2 id="pending-title" ref={pendingHeadingRef} tabIndex={-1}>等你判断</h2>
           {pendingCount ? <span>{pendingCount}</span> : null}
         </div>
         {pending.items.length ? (
-          <div className={styles.list}>
+          <div className={styles.list} ref={pendingListRef}>
             {pending.items.map((connection) => (
               <ConnectionCard
                 connection={connection}
+                disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null}
                 deciding={decidingId === connection.id}
                 key={connection.id}
                 onDecide={(decision) => void decide(connection, decision)}
@@ -372,7 +435,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
           <p className={styles.empty}>开始串联，或继续写下新内容后，可能的联系会出现在这里。</p>
         )}
         {pending.nextCursor ? (
-          <button className={styles.more} type="button" disabled={loadingMore !== null} onClick={() => void loadMore('pending')}>
+          <button className={styles.more} type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void loadMore('pending')}>
             {loadingMore === 'pending' ? '正在加载' : '查看更多'}
           </button>
         ) : null}
@@ -390,7 +453,7 @@ export function ReviewWorkspace({ initialData }: { initialData: ReviewInitialDat
           <p className={styles.empty}>你保留的联系会留在这里。</p>
         )}
         {confirmed.nextCursor ? (
-          <button className={styles.more} type="button" disabled={loadingMore !== null} onClick={() => void loadMore('confirmed')}>
+          <button className={styles.more} type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void loadMore('confirmed')}>
             {loadingMore === 'confirmed' ? '正在加载' : '查看更多'}
           </button>
         ) : null}

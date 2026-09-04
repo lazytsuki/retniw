@@ -8,7 +8,11 @@ const mocks = vi.hoisted(() => ({
   deleteCollection: vi.fn(),
 }))
 
-vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
+vi.mock('@/src/lib/auth/require-user', () => ({
+  requireMutationUser: mocks.requireUser,
+  requireRequestUser: mocks.requireUser,
+  requireUser: mocks.requireUser,
+}))
 vi.mock('@/src/lib/supabase/service', () => ({ createServiceClient: () => ({}) }))
 vi.mock('@/src/server/repositories/thought-repository', () => ({
   ThoughtRepository: class {

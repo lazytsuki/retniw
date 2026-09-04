@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser, requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { decodeCursor, FragmentRepository } from '@/src/server/repositories/fragment-repository'
 import { parseFragmentInput } from '@/src/server/fragments/parse-fragment-input'
@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { clientRequestId, content, inputMode } = parseFragmentInput(
       await request.json().catch(() => null),
     )

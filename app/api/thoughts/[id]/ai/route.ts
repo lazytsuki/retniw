@@ -3,7 +3,7 @@ import { ApiError } from '@/src/lib/api-error'
 import { apiErrorResponse } from '@/src/lib/api-response'
 import { hasNewUserContext } from '@/src/lib/ai-context'
 import { aiOutputForDisplay } from '@/src/lib/ai-output'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { DeepSeekTextProvider, type AiAction } from '@/src/server/ai/deepseek-text-provider'
 import { EntryRepository } from '@/src/server/repositories/entry-repository'
@@ -22,7 +22,7 @@ function encodeEvent(encoder: TextEncoder, event: string, data: unknown) {
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { id: rawThoughtId } = await params
     const thoughtId = requireUuid(rawThoughtId, 'id')
     const body = (await request.json().catch(() => null)) as {

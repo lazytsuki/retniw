@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { apiErrorResponse } from '@/src/lib/api-response'
 import { ApiError } from '@/src/lib/api-error'
 import { requireOwnedResource } from '@/src/lib/auth/require-owned-resource'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { DeepSeekTextProvider } from '@/src/server/ai/deepseek-text-provider'
 
@@ -27,9 +27,9 @@ function toClarification(row: {
   }
 }
 
-export async function POST(_request: Request, { params }: RouteContext) {
+export async function POST(request: Request, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { id } = await params
     const fragment = await requireOwnedResource<{ id: string; content: string }>({
       table: 'fragments',

@@ -37,16 +37,17 @@ export default async function ThoughtPage({ params }: ThoughtPageProps) {
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect('/login')
     if (error instanceof ApiError && error.status === 404) {
-      return <main className="shell"><p>没有找到这段内容。</p></main>
+      return <main className="shell" id="main-content" tabIndex={-1}><p>没有找到这段内容。</p></main>
     }
     throw error
   }
 
   return (
-    <main className="app-shell">
-      <AppHeader account={{ email: user.email, nickname: user.nickname }} />
+    <main className="app-shell" id="main-content" tabIndex={-1} data-retniw-user-id={user.id}>
+      <AppHeader account={{ email: user.email, nickname: user.nickname }} userId={user.id} />
       <ThoughtWorkspace
         key={data.thought.id}
+        userId={user.id}
         initialThought={data.thought}
         initialEntries={data.entries}
         initialCheckpoints={data.checkpoints}

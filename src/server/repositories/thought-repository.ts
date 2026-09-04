@@ -56,17 +56,19 @@ export class ThoughtRepository {
 
   async ensure(userId: string, thoughtId: string) {
     const { data, error } = await this.client
-      .from('thoughts')
-      .insert({ id: thoughtId, user_id: userId })
-      .select('*')
-      .single<ThoughtRecord>()
+      .rpc('retniw_ensure_thought', {
+        target_user_id: userId,
+        target_thought_id: thoughtId,
+      })
+    const result = data as { thought?: ThoughtRecord; created?: boolean } | null
 
-    if (!error && data) return { thought: toThought(data), created: true }
-    if (error?.code !== '23505') {
+    if (error?.code === 'P0001' && error.message?.startsWith('RETNIW_THOUGHT_DELETED')) {
+      throw new ApiError(409, 'THOUGHT_DELETED', 'Thought was deleted')
+    }
+    if (error || !result?.thought || typeof result.created !== 'boolean') {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to create thought')
     }
-
-    return { thought: await this.getOwned(userId, thoughtId), created: false }
+    return { thought: toThought(result.thought), created: result.created }
   }
 
   async getOwned(userId: string, thoughtId: string) {
@@ -295,19 +297,16 @@ export class ThoughtRepository {
 
   async deleteOwned(userId: string, thoughtId: string) {
     const { data, error } = await this.client
-      .from('thoughts')
-      .delete()
-      .eq('user_id', userId)
-      .eq('id', thoughtId)
-      .is('deleted_at', null)
-      .select('id')
-      .maybeSingle<{ id: string }>()
+      .rpc('retniw_delete_thought', {
+        target_user_id: userId,
+        target_thought_id: thoughtId,
+      })
 
     if (error?.code === '23503') {
       throw new ApiError(409, 'STATE_CONFLICT', 'Thought cannot be deleted')
     }
     if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to delete thought')
-    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
+    if (data !== true) throw new ApiError(404, 'NOT_FOUND', 'Thought not found')
   }
 }
 

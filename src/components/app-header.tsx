@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useActionState, useRef } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
 import type { MouseEvent } from 'react'
 import { updateNickname, type NicknameActionState } from '@/app/account/actions'
 import { logout } from '@/app/auth/actions'
@@ -35,7 +35,7 @@ function SidebarIcon({ direction }: { direction: 'collapse' | 'expand' }) {
   )
 }
 
-export function AppHeader({ account }: { account?: AccountProfile }) {
+export function AppHeader({ account, userId }: { account?: AccountProfile; userId?: string }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const collapseRef = useRef<HTMLButtonElement>(null)
   const expandRef = useRef<HTMLButtonElement>(null)
@@ -56,6 +56,14 @@ export function AppHeader({ account }: { account?: AccountProfile }) {
     : nicknameState.nickname
   const accountLabel = currentNickname || account?.email || '账号'
   useDismissibleLayer('account', menuRef)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const frame = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLInputElement>('.account-menu__input')?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [menuOpen])
 
   function collapseSidebar(event: MouseEvent<HTMLButtonElement>) {
     overlay.close()
@@ -113,18 +121,20 @@ export function AppHeader({ account }: { account?: AccountProfile }) {
           type="button"
           aria-expanded={menuOpen}
           aria-haspopup="dialog"
+          aria-controls={menuOpen ? 'account-menu-panel' : undefined}
           aria-label={`账户：${accountLabel}`}
           title={accountLabel}
           onClick={(event) => menuOpen
             ? overlay.close('account')
             : overlay.open('account', event.currentTarget)}
         >{accountLabel}</button>
-        {menuOpen && <div className="account-menu__panel" role="dialog" aria-label="账户设置">
+        {menuOpen && <div className="account-menu__panel" id="account-menu-panel" role="dialog" aria-label="账户设置">
           <div className="account-menu__identity">
             <span>当前账号</span>
             <strong className="account-menu__email">{account?.email ?? '未提供邮箱'}</strong>
           </div>
           <form action={nicknameAction} className="account-menu__nickname-form">
+            <input name="expectedUserId" type="hidden" value={userId ?? ''} />
             <label htmlFor="account-nickname">昵称</label>
             <div className="account-menu__nickname-row">
               <input
@@ -152,6 +162,7 @@ export function AppHeader({ account }: { account?: AccountProfile }) {
             ) : null}
           </form>
           <form action={logout}>
+            <input name="expectedUserId" type="hidden" value={userId ?? ''} />
             <button type="submit">退出登录</button>
           </form>
         </div>}

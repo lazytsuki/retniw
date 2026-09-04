@@ -9,9 +9,12 @@ import type { ThoughtCollection } from '@/src/server/repositories/collection-rep
 import { ThoughtListItem } from './thought-list-item'
 import type { ThoughtAction } from './thought-action-menu'
 import { useOverlayController } from '@/src/components/overlay-provider'
+import { userBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 import { useWorkspaceSidebar } from '@/src/components/workspace-sidebar-provider'
+import { discardThoughtOutboxItems } from '@/src/lib/capture/capture-store'
 
 type ThoughtNavigationProps = {
+  userId: string
   activeThoughtId: string
   activeView?: 'review'
   currentStarted: boolean
@@ -86,6 +89,7 @@ function ChevronIcon() {
 }
 
 export function ThoughtNavigation({
+  userId,
   activeThoughtId,
   activeView,
   currentStarted,
@@ -123,6 +127,12 @@ export function ThoughtNavigation({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const deleteDialogRef = useRef<HTMLDialogElement>(null)
   const collectionDeleteDialogRef = useRef<HTMLDialogElement>(null)
+  const pendingDeleteFocusRef = useRef<HTMLElement | null>(null)
+  const deleteCancelFocusRef = useRef<HTMLElement | null>(null)
+  const deleteDialogDismissedRef = useRef(false)
+  const pendingCollectionDeleteFocusRef = useRef<HTMLElement | null>(null)
+  const collectionDeleteCancelFocusRef = useRef<HTMLElement | null>(null)
+  const collectionDeleteDialogDismissedRef = useRef(false)
   const viewRequestEpochRef = useRef(0)
   const recentThoughts = useMemo(
     () => mergeThoughts(thoughts, additionalThoughts).filter((thought) => !removedIds.has(thought.id)),
@@ -148,7 +158,7 @@ export function ThoughtNavigation({
     }
     const closeOnDesktop = () => {
       if (mobileQuery.matches) return
-      closeOverlay()
+      if (overlay.activeId?.includes(':history:')) closeOverlay()
       historyTriggerRef.current = null
       setHistoryOpen(false)
     }
@@ -169,7 +179,7 @@ export function ThoughtNavigation({
       window.removeEventListener('resize', closeOnDesktop)
       mobileQuery.removeEventListener('change', closeOnDesktop)
     }
-  }, [closeOverlay])
+  }, [closeOverlay, overlay.activeId])
 
   useEffect(() => {
     const dialog = deleteDialogRef.current
@@ -208,13 +218,60 @@ export function ThoughtNavigation({
 
   useEffect(() => {
     if (initialCollections !== null) return
-    void fetch('/api/collections')
+    void userBoundFetch(userId, '/api/collections')
       .then(async (response) => {
         const payload = await response.json() as { data?: { collections?: ThoughtCollection[] } }
         if (response.ok) setCollections(payload.data?.collections ?? [])
       })
       .catch(() => undefined)
-  }, [initialCollections])
+  }, [initialCollections, userId])
+
+  function thoughtFocusTarget(thoughtId: string, trigger?: HTMLElement | null) {
+    const activeScope = overlay.activeId?.includes(':history:') ? 'history' : 'sidebar'
+    const actionTrigger = trigger?.closest('.thought-list-item')
+      ? trigger
+      : document.getElementById(`thought-action-trigger:${activeScope}:${thoughtId}`)
+    const item = actionTrigger?.closest<HTMLElement>('.thought-list-item')
+    const siblings = item?.parentElement
+      ? Array.from(item.parentElement.children).filter(
+          (element): element is HTMLElement => element instanceof HTMLElement && element.classList.contains('thought-list-item'),
+        )
+      : []
+    const index = item ? siblings.indexOf(item) : -1
+    const adjacent = index >= 0
+      ? siblings[index + 1] ?? siblings[index - 1]
+      : null
+    return adjacent?.querySelector<HTMLElement>('.thought-link')
+      ?? (thoughtId === activeThoughtId
+        ? document.querySelector<HTMLTextAreaElement>('.thought-composer textarea')
+        : null)
+      ?? (activeScope === 'history'
+        ? document.querySelector<HTMLButtonElement>('.thought-history-dialog__close')
+        : document.querySelector<HTMLAnchorElement>('.new-thought-action'))
+  }
+
+  function collectionFocusTarget(trigger: HTMLElement) {
+    const row = trigger.closest<HTMLElement>('.collection-link')
+    const rows = row?.parentElement
+      ? Array.from(row.parentElement.querySelectorAll<HTMLElement>(':scope > .collection-link'))
+      : []
+    const index = row ? rows.indexOf(row) : -1
+    const adjacent = index >= 0 ? rows[index + 1] ?? rows[index - 1] : null
+    return adjacent?.querySelector<HTMLElement>('button')
+      ?? document.querySelector<HTMLAnchorElement>('.new-thought-action')
+  }
+
+  function focusAfterMutation(target: HTMLElement | null, fallbackToComposer = false) {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      if (target?.isConnected && target.getClientRects().length > 0) {
+        target.focus({ preventScroll: true })
+        return
+      }
+      if (fallbackToComposer) {
+        document.querySelector<HTMLTextAreaElement>('.thought-composer textarea')?.focus({ preventScroll: true })
+      }
+    }))
+  }
 
   function openHistory(trigger: HTMLButtonElement) {
     overlay.close()
@@ -259,7 +316,7 @@ export function ThoughtNavigation({
     setLoading(true)
     setLoadError('')
     try {
-      const response = await fetch(queryFor(nextView))
+      const response = await userBoundFetch(userId, queryFor(nextView))
       const payload = await response.json() as { data?: { thoughts?: ThoughtSummary[]; nextCursor?: string | null } }
       if (requestEpoch !== viewRequestEpochRef.current) return
       if (!response.ok || !payload.data?.thoughts) throw new Error('LOAD_FAILED')
@@ -282,7 +339,7 @@ export function ThoughtNavigation({
     setLoading(true)
     setLoadError('')
     try {
-      const response = await fetch(queryFor(requestedView, nextCursor))
+      const response = await userBoundFetch(userId, queryFor(requestedView, nextCursor))
       const payload = await response.json() as { data?: { thoughts?: ThoughtSummary[]; nextCursor?: string | null } }
       if (requestEpoch !== viewRequestEpochRef.current) return
       if (!response.ok || !payload.data?.thoughts) throw new Error('LOAD_FAILED')
@@ -312,12 +369,15 @@ export function ThoughtNavigation({
   async function performAction(
     thought: ThoughtSummary,
     action: Exclude<ThoughtAction, 'delete'>,
+    trigger?: HTMLElement | null,
   ) {
+    const focusTarget = thoughtFocusTarget(thought.id, trigger)
     setRevealedThoughtId(null)
     setRemovedIds((current) => new Set(current).add(thought.id))
+    focusAfterMutation(focusTarget, thought.id === activeThoughtId)
     setLoadError('')
     try {
-      const response = await fetch(`/api/thoughts/${thought.id}`, {
+      const response = await userBoundFetch(userId, `/api/thoughts/${thought.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action }),
@@ -330,7 +390,7 @@ export function ThoughtNavigation({
         next.delete(thought.id)
         return next
       })
-      setLoadError('没有完成，可以重试。')
+      setLoadError('操作结果未确认，可以重试。')
     }
   }
 
@@ -340,12 +400,33 @@ export function ThoughtNavigation({
     trigger?: HTMLElement | null,
   ) {
     if (action === 'delete') {
+      if (deletingThought) {
+        setLoadError('正在删除上一个想法，请稍候。')
+        return
+      }
       setPendingDelete(thought)
+      pendingDeleteFocusRef.current = thoughtFocusTarget(thought.id, trigger)
+      deleteCancelFocusRef.current = trigger ?? null
+      deleteDialogDismissedRef.current = false
       setDeleteError('')
       overlay.open('delete-confirm', trigger)
       return
     }
-    await performAction(thought, action)
+    await performAction(thought, action, trigger)
+  }
+
+  function cancelThoughtDelete() {
+    if (deletingThought) {
+      deleteDialogDismissedRef.current = true
+      overlay.close('delete-confirm')
+      focusAfterMutation(pendingDeleteFocusRef.current, pendingDelete?.id === activeThoughtId)
+      return
+    }
+    const focusTarget = deleteCancelFocusRef.current
+    setPendingDelete(null)
+    setDeleteError('')
+    overlay.close('delete-confirm')
+    focusAfterMutation(focusTarget)
   }
 
   async function deleteThought() {
@@ -356,19 +437,34 @@ export function ThoughtNavigation({
     setRevealedThoughtId(null)
     setRemovedIds((current) => new Set(current).add(thought.id))
     try {
-      const response = await fetch(`/api/thoughts/${thought.id}`, { method: 'DELETE' })
-      if (response.status !== 204) throw new Error('DELETE_FAILED')
+      const response = await userBoundFetch(userId, `/api/thoughts/${thought.id}`, {
+        method: 'DELETE',
+      })
+      if (response.status !== 204 && response.status !== 404) throw new Error('DELETE_FAILED')
+      const localCleanupFailed = await discardThoughtOutboxItems(userId, thought.id)
+        .then(() => false)
+        .catch(() => true)
       setPendingDelete(null)
       overlay.close('delete-confirm')
-      if (thought.id === activeThoughtId) router.push('/')
-      else router.refresh()
+      if (thought.id === activeThoughtId) {
+        router.push('/')
+      } else {
+        router.refresh()
+        if (!deleteDialogDismissedRef.current) focusAfterMutation(pendingDeleteFocusRef.current)
+        if (localCleanupFailed) setLoadError('想法已删除，本机待同步记录未清理。')
+      }
     } catch {
       setRemovedIds((current) => {
         const next = new Set(current)
         next.delete(thought.id)
         return next
       })
-      setDeleteError('没有删除，可以重试。')
+      if (deleteDialogDismissedRef.current) {
+        setPendingDelete(null)
+        setLoadError('删除结果未确认，请重试。')
+      } else {
+        setDeleteError('删除结果未确认，请重试。')
+      }
     } finally {
       setDeletingThought(false)
     }
@@ -376,17 +472,20 @@ export function ThoughtNavigation({
 
   async function moveThought(thought: ThoughtSummary, collectionId: string | null) {
     const previousCollectionId = thought.collectionId
+    const removesFromCurrentView = view.kind === 'collection' && collectionId !== view.id
+    const focusTarget = removesFromCurrentView ? thoughtFocusTarget(thought.id) : null
     setCollectionOverrides((current) => new Map(current).set(thought.id, collectionId))
     const patchThought = (item: ThoughtSummary): ThoughtSummary => (
       item.id === thought.id ? { ...item, collectionId } : item
     )
     setAdditionalThoughts((current) => current.map(patchThought))
     setViewThoughts((current) => current.map(patchThought))
-    if (view.kind === 'collection' && collectionId !== view.id) {
+    if (removesFromCurrentView) {
       setRemovedIds((current) => new Set(current).add(thought.id))
+      focusAfterMutation(focusTarget, thought.id === activeThoughtId)
     }
     try {
-      const response = await fetch(`/api/thoughts/${thought.id}`, {
+      const response = await userBoundFetch(userId, `/api/thoughts/${thought.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'move', collectionId }),
@@ -412,9 +511,30 @@ export function ThoughtNavigation({
   }
 
   function requestCollectionDelete(collection: ThoughtCollection, trigger: HTMLButtonElement) {
+    if (deletingCollection) {
+      setLoadError('正在删除上一个合集，请稍候。')
+      return
+    }
     setPendingCollectionDelete(collection)
+    pendingCollectionDeleteFocusRef.current = collectionFocusTarget(trigger)
+    collectionDeleteCancelFocusRef.current = trigger
+    collectionDeleteDialogDismissedRef.current = false
     setCollectionDeleteError('')
     overlay.open('collection-delete-confirm', trigger)
+  }
+
+  function cancelCollectionDelete() {
+    if (deletingCollection) {
+      collectionDeleteDialogDismissedRef.current = true
+      overlay.close('collection-delete-confirm')
+      focusAfterMutation(collectionDeleteCancelFocusRef.current)
+      return
+    }
+    const focusTarget = collectionDeleteCancelFocusRef.current
+    setPendingCollectionDelete(null)
+    setCollectionDeleteError('')
+    overlay.close('collection-delete-confirm')
+    focusAfterMutation(focusTarget)
   }
 
   async function deleteCollection() {
@@ -423,8 +543,10 @@ export function ThoughtNavigation({
     setDeletingCollection(true)
     setCollectionDeleteError('')
     try {
-      const response = await fetch(`/api/collections/${collection.id}`, { method: 'DELETE' })
-      if (!response.ok) throw new Error('DELETE_COLLECTION_FAILED')
+      const response = await userBoundFetch(userId, `/api/collections/${collection.id}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok && response.status !== 404) throw new Error('DELETE_COLLECTION_FAILED')
       setCollections((current) => current.filter((item) => item.id !== collection.id))
       setCollectionOverrides((current) => {
         const next = new Map(current)
@@ -438,16 +560,22 @@ export function ThoughtNavigation({
       })
       setPendingCollectionDelete(null)
       overlay.close('collection-delete-confirm')
+      focusAfterMutation(pendingCollectionDeleteFocusRef.current)
       router.refresh()
     } catch {
-      setCollectionDeleteError('没有删除合集，可以重试。')
+      if (collectionDeleteDialogDismissedRef.current) {
+        setPendingCollectionDelete(null)
+        setLoadError('删除合集的结果未确认，请重试。')
+      } else {
+        setCollectionDeleteError('删除合集的结果未确认，请重试。')
+      }
     } finally {
       setDeletingCollection(false)
     }
   }
 
   async function createCollection(name: string) {
-    const response = await fetch('/api/collections', {
+    const response = await userBoundFetch(userId, '/api/collections', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id: crypto.randomUUID(), name }),
@@ -631,30 +759,22 @@ export function ThoughtNavigation({
       <dialog
         className="confirm-dialog"
         ref={deleteDialogRef}
+        aria-labelledby="delete-thought-dialog-title"
+        aria-describedby="delete-thought-dialog-description"
         onClick={(event) => {
-          if (event.target !== event.currentTarget || deletingThought) return
-          setPendingDelete(null)
-          setDeleteError('')
-          overlay.close('delete-confirm')
+          if (event.target === event.currentTarget) cancelThoughtDelete()
         }}
         onCancel={(event) => {
           event.preventDefault()
-          if (deletingThought) return
-          setPendingDelete(null)
-          setDeleteError('')
-          overlay.close('delete-confirm')
+          cancelThoughtDelete()
         }}
-        onClose={() => deleteOpen && !deletingThought && overlay.close('delete-confirm')}
+        onClose={() => deleteOpen && cancelThoughtDelete()}
       >
-        <h2>删除这个想法？</h2>
-        <p>删除后无法恢复，相关联系也会一并删除。</p>
+        <h2 id="delete-thought-dialog-title">删除这个想法？</h2>
+        <p id="delete-thought-dialog-description">删除后无法恢复，相关联系也会一并删除。</p>
         {deleteError && <p className="confirm-dialog__error" role="alert">{deleteError}</p>}
         <div>
-          <button type="button" disabled={deletingThought} onClick={() => {
-            setPendingDelete(null)
-            setDeleteError('')
-            overlay.close('delete-confirm')
-          }}>取消</button>
+          <button type="button" onClick={cancelThoughtDelete}>{deletingThought ? '关闭' : '取消'}</button>
           <button className="danger" type="button" disabled={deletingThought} onClick={() => void deleteThought()}>
             {deletingThought ? '正在删除' : '删除'}
           </button>
@@ -664,30 +784,22 @@ export function ThoughtNavigation({
       <dialog
         className="confirm-dialog"
         ref={collectionDeleteDialogRef}
+        aria-labelledby="delete-collection-dialog-title"
+        aria-describedby="delete-collection-dialog-description"
         onClick={(event) => {
-          if (event.target !== event.currentTarget || deletingCollection) return
-          setPendingCollectionDelete(null)
-          setCollectionDeleteError('')
-          overlay.close('collection-delete-confirm')
+          if (event.target === event.currentTarget) cancelCollectionDelete()
         }}
         onCancel={(event) => {
           event.preventDefault()
-          if (deletingCollection) return
-          setPendingCollectionDelete(null)
-          setCollectionDeleteError('')
-          overlay.close('collection-delete-confirm')
+          cancelCollectionDelete()
         }}
-        onClose={() => collectionDeleteOpen && !deletingCollection && overlay.close('collection-delete-confirm')}
+        onClose={() => collectionDeleteOpen && cancelCollectionDelete()}
       >
-        <h2>删除这个合集？</h2>
-        <p>只删除合集，不会删除里面的想法。</p>
+        <h2 id="delete-collection-dialog-title">删除这个合集？</h2>
+        <p id="delete-collection-dialog-description">只删除合集，不会删除里面的想法。</p>
         {collectionDeleteError && <p className="confirm-dialog__error" role="alert">{collectionDeleteError}</p>}
         <div>
-          <button type="button" disabled={deletingCollection} onClick={() => {
-            setPendingCollectionDelete(null)
-            setCollectionDeleteError('')
-            overlay.close('collection-delete-confirm')
-          }}>取消</button>
+          <button type="button" onClick={cancelCollectionDelete}>{deletingCollection ? '关闭' : '取消'}</button>
           <button className="danger" type="button" disabled={deletingCollection} onClick={() => void deleteCollection()}>
             {deletingCollection ? '正在删除' : '删除合集'}
           </button>

@@ -15,7 +15,10 @@ export function StreamingAiEntry({ state, onClear }: { state: AiActionState; onC
   const content = aiOutputForDisplay(state.content, state.action)
 
   return (
-    <article className="thought-entry thought-entry--ai-live" aria-live="polite">
+    <article className="thought-entry thought-entry--ai-live" aria-busy={state.status === 'streaming' || undefined}>
+      <p className="visually-hidden" role="status">
+        {state.status === 'error' ? '生成失败，结果没有保存' : '正在生成内容'}
+      </p>
       <p className="entry-source entry-source--assist">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 5v5a4 4 0 0 0 4 4h8" />

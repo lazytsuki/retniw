@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { EntryRepository } from '@/src/server/repositories/entry-repository'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
@@ -15,7 +15,7 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { id: rawThoughtId } = await params
     const thoughtId = requireUuid(rawThoughtId, 'id')
     const input = parseThoughtEntryInput(await request.json().catch(() => null))

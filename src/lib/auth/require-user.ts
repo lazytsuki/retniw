@@ -1,4 +1,5 @@
 import { ApiError } from '@/src/lib/api-error'
+import { expectedUserIdHeader, expectedUserIdQuery } from './user-bound-fetch'
 import { nicknameFromMetadata } from './account-profile'
 
 export type AuthenticatedUser = {
@@ -36,4 +37,28 @@ export async function requireUser(authClient?: AuthClient): Promise<Authenticate
     email: typeof data.claims.email === 'string' ? data.claims.email : null,
     nickname: nicknameFromMetadata(data.claims.user_metadata),
   }
+}
+
+export async function requireRequestUser(
+  request: Request,
+  authClient?: AuthClient,
+): Promise<AuthenticatedUser> {
+  const user = await requireUser(authClient)
+  const expectedUserId = request.headers.get(expectedUserIdHeader)
+    ?? new URL(request.url).searchParams.get(expectedUserIdQuery)
+  if (expectedUserId !== user.id) {
+    throw new ApiError(
+      409,
+      'AUTH_CONTEXT_CHANGED',
+      '账号已在其他页面切换，请刷新后继续。',
+    )
+  }
+  return user
+}
+
+export async function requireMutationUser(
+  request: Request,
+  authClient?: AuthClient,
+): Promise<AuthenticatedUser> {
+  return requireRequestUser(request, authClient)
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { currentUserBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 
 type DailyProductEventName = 'workspace_active_day' | 'review_opened'
 
@@ -15,7 +16,7 @@ async function sendProductEvent(
   event: { eventName: DailyProductEventName } | ConnectionOpenedEvent,
 ) {
   try {
-    const response = await fetch('/api/product-events', {
+    const response = await currentUserBoundFetch('/api/product-events', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(event),

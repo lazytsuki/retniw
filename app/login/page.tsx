@@ -29,9 +29,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const { error, mode, notice } = await searchParams
   const isSignup = mode === 'signup'
+  const errorMessage = error ? ERROR_MESSAGES[error] ?? '没有完成，请稍后再试。' : ''
 
   return (
-    <main className="shell">
+    <main className="shell" id="main-content" tabIndex={-1}>
       <section className="panel panel--compact" aria-labelledby="login-title">
         <p className="login-brand"><RetniwSymbol /><span>retniw</span></p>
         <nav className="auth-mode-switch" aria-label="账号入口">
@@ -46,7 +47,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <form action={isSignup ? signup : login} className="login-form">
           <label>
             邮箱
-            <input name="email" type="email" autoComplete="email" required />
+            <input
+              name="email"
+              type="email"
+              autoComplete="email"
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'login-error' : undefined}
+              required
+            />
           </label>
           <label>
             密码
@@ -54,6 +62,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               name="password"
               type="password"
               autoComplete={isSignup ? 'new-password' : 'current-password'}
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? 'login-error' : undefined}
               minLength={isSignup ? MIN_PASSWORD_LENGTH : undefined}
               required
             />
@@ -65,12 +75,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 name="passwordConfirmation"
                 type="password"
                 autoComplete="new-password"
+                aria-invalid={Boolean(error) || undefined}
+                aria-describedby={error ? 'login-error' : undefined}
                 minLength={MIN_PASSWORD_LENGTH}
                 required
               />
             </label>
           ) : null}
-          {error ? <p className="form-error">{ERROR_MESSAGES[error] ?? '没有完成，请稍后再试。'}</p> : null}
+          {error ? <p className="form-error" id="login-error" role="alert">{errorMessage}</p> : null}
           <AuthSubmitButton isSignup={isSignup} />
         </form>
         <p className="login-note">

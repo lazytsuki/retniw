@@ -26,10 +26,11 @@ export default async function CapturePage() {
   ])
 
   return (
-    <main className="app-shell">
-      <AppHeader account={{ email: user.email, nickname: user.nickname }} />
+    <main className="app-shell" id="main-content" tabIndex={-1} data-retniw-user-id={userId}>
+      <AppHeader account={{ email: user.email, nickname: user.nickname }} userId={userId} />
       <ThoughtWorkspace
         key="new-thought"
+        userId={userId}
         initialThought={null}
         initialEntries={[]}
         initialCheckpoints={[]}

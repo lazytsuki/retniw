@@ -11,6 +11,7 @@ export type ThoughtAction = 'archive' | 'unarchive' | 'delete'
 
 type ThoughtActionMenuProps = {
   thought: Thought
+  actionLabel: string
   menuScope: 'sidebar' | 'history'
   collections: ThoughtCollection[]
   mode: 'active' | 'archived'
@@ -38,6 +39,7 @@ function UnarchiveIcon() {
 
 export function ThoughtActionMenu({
   thought,
+  actionLabel,
   menuScope,
   collections,
   mode,
@@ -51,6 +53,7 @@ export function ThoughtActionMenu({
   const triggerId = `thought-action-trigger:${menuScope}:${thought.id}`
   const actionTriggerRef = useRef<HTMLButtonElement>(null)
   const layerRef = useRef<HTMLDivElement>(null)
+  const initialMenuFocusRef = useRef<'first' | 'last'>('first')
   const movePendingRef = useRef(false)
   const [moveState, setMoveState] = useState<'idle' | 'pending' | 'error'>('idle')
   const overlay = useOverlayController()
@@ -62,9 +65,9 @@ export function ThoughtActionMenu({
   useLayoutEffect(() => {
     if (!menuOpen) return
     const frame = window.requestAnimationFrame(() => {
-      layerRef.current
-        ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
-        ?.focus({ preventScroll: true })
+      const items = layerRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+      const item = initialMenuFocusRef.current === 'last' ? items?.item((items?.length ?? 1) - 1) : items?.item(0)
+      item?.focus({ preventScroll: true })
     })
     return () => window.cancelAnimationFrame(frame)
   }, [menuOpen])
@@ -147,6 +150,24 @@ export function ThoughtActionMenu({
   }
 
   function navigateMenu(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      event.stopPropagation()
+      const trigger = actionTriggerRef.current
+      const layer = layerRef.current
+      const focusable = Array.from(document.querySelectorAll<HTMLElement>(
+        'a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )).filter((item) => item.getClientRects().length > 0)
+      const direction = event.shiftKey ? -1 : 1
+      let nextIndex = trigger ? focusable.indexOf(trigger) + direction : -1
+      while (nextIndex >= 0 && nextIndex < focusable.length && layer?.contains(focusable[nextIndex]!)) {
+        nextIndex += direction
+      }
+      const target = focusable[nextIndex]
+      overlay.close()
+      window.requestAnimationFrame(() => target?.focus({ preventScroll: true }))
+      return
+    }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'),
@@ -160,8 +181,8 @@ export function ThoughtActionMenu({
       : event.key === 'End'
         ? items.length - 1
         : event.key === 'ArrowDown'
-          ? (currentIndex + 1 + items.length) % items.length
-          : (currentIndex - 1 + items.length) % items.length
+          ? currentIndex < 0 ? 0 : (currentIndex + 1) % items.length
+          : currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length
     items[nextIndex]?.focus({ preventScroll: true })
   }
 
@@ -204,7 +225,7 @@ export function ThoughtActionMenu({
         onChoose={chooseCollection}
       />
       {moveState === 'pending' && <p className="collection-picker-layer__status" role="status">正在移入</p>}
-      {moveState === 'error' && <p className="collection-picker-layer__status collection-picker-layer__status--error" role="alert">没有移入，可以重试。</p>}
+      {moveState === 'error' && <p className="collection-picker-layer__status collection-picker-layer__status--error" role="alert">移入结果未确认，可以重试。</p>}
     </div>
   ) : null
 
@@ -215,14 +236,24 @@ export function ThoughtActionMenu({
         ref={actionTriggerRef}
         className="thought-action-menu__trigger"
         type="button"
-        aria-label="想法操作"
+        aria-label={`想法操作：${actionLabel}`}
         aria-haspopup="menu"
         aria-expanded={menuOpen || pickerOpen}
         aria-controls={menuOpen ? `${menuId}:panel` : pickerOpen ? `${pickerId}:panel` : undefined}
         onClick={(event) => {
           onOpen?.()
           if (menuOpen || pickerOpen) overlay.close()
-          else overlay.open(menuId, event.currentTarget)
+          else {
+            initialMenuFocusRef.current = 'first'
+            overlay.open(menuId, event.currentTarget)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+          event.preventDefault()
+          onOpen?.()
+          initialMenuFocusRef.current = event.key === 'ArrowUp' ? 'last' : 'first'
+          if (!menuOpen) overlay.open(menuId, event.currentTarget)
         }}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">

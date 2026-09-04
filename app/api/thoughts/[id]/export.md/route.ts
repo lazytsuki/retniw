@@ -1,5 +1,5 @@
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireRequestUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { createThoughtMarkdownStream } from '@/src/server/exports/export-streams'
 import { ThoughtExportRepository } from '@/src/server/repositories/thought-export-repository'
@@ -11,9 +11,22 @@ export const dynamic = 'force-dynamic'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function HEAD(request: Request, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireRequestUser(request)
+    const { id: rawId } = await params
+    const id = requireUuid(rawId, 'id')
+    await new ThoughtRepository(createServiceClient()).getOwned(user.id, id)
+    return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
+  } catch (error) {
+    const response = apiErrorResponse(error)
+    return new Response(null, { status: response.status, headers: response.headers })
+  }
+}
+
+export async function GET(request: Request, { params }: RouteContext) {
+  try {
+    const user = await requireRequestUser(request)
     const { id: rawId } = await params
     const id = requireUuid(rawId, 'id')
     const client = createServiceClient()

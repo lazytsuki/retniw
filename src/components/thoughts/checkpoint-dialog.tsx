@@ -32,7 +32,7 @@ export function CheckpointDialog({ open, onSave }: {
   }, [open])
 
   function close() {
-    if (saving) return
+    if (savingRef.current) return
     setNote('')
     setError('')
     requestIdsRef.current = null
@@ -52,7 +52,7 @@ export function CheckpointDialog({ open, onSave }: {
       requestIdsRef.current = null
       overlay.close('checkpoint')
     } catch {
-      setError('没有保存，可以重试。')
+      setError('保存结果未确认。保持原内容可安全重试；修改后会作为新的检查点保存。')
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -63,14 +63,30 @@ export function CheckpointDialog({ open, onSave }: {
     <dialog
       className="checkpoint-dialog"
       ref={dialogRef}
+      aria-labelledby="checkpoint-dialog-title"
+      aria-describedby="checkpoint-dialog-description"
       onClick={(event) => { if (event.target === event.currentTarget) close() }}
       onCancel={(event) => { event.preventDefault(); close() }}
-      onClose={() => open && !saving && overlay.close('checkpoint')}
+      onClose={() => open && overlay.close('checkpoint')}
     >
-      <header><h2>先到这里</h2><button type="button" onClick={close}>关闭</button></header>
+      <header>
+        <h2 id="checkpoint-dialog-title">先到这里</h2>
+        <button type="button" aria-label={saving ? '正在保存，暂时无法关闭' : '关闭检查点'} disabled={saving} onClick={close}>关闭</button>
+      </header>
+      <p id="checkpoint-dialog-description">保存一个检查点，然后回到全部想法。</p>
       <label>
         下次从哪里接着想？（可不填）
-        <textarea autoFocus maxLength={500} placeholder="写一句提醒" value={note} onChange={(event) => setNote(event.target.value)} />
+        <textarea
+          autoFocus
+          disabled={saving}
+          maxLength={500}
+          placeholder="写一句提醒"
+          value={note}
+          onChange={(event) => {
+            requestIdsRef.current = null
+            setNote(event.target.value)
+          }}
+        />
       </label>
       {error && <p role="alert">{error}</p>}
       <button type="button" disabled={saving} onClick={() => void submit()}>{saving ? '正在保存' : '回到全部想法'}</button>

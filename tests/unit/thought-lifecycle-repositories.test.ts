@@ -145,6 +145,19 @@ function memoryClient(input: {
         return callback
       })
     },
+    async rpc(name: string, args: Record<string, string>) {
+      if (name === 'retniw_delete_thought') {
+        const index = tables.thoughts.findIndex((row) => (
+          row.user_id === args.target_user_id &&
+          row.id === args.target_thought_id &&
+          row.deleted_at === null
+        ))
+        if (index < 0) return { data: false, error: null }
+        tables.thoughts.splice(index, 1)
+        return { data: true, error: null }
+      }
+      return { data: null, error: { code: '42883', message: 'Unknown RPC' } }
+    },
   } as unknown as SupabaseClient
 
   return {
@@ -189,6 +202,71 @@ afterEach(() => {
 })
 
 describe('thought lifecycle actions', () => {
+  it('creates thoughts through the identity-locked RPC and preserves its created result', async () => {
+    const rpc = vi.fn(async () => ({
+      data: { thought: thought(), created: true },
+      error: null,
+    }))
+    const repository = new ThoughtRepository({ rpc } as unknown as SupabaseClient)
+
+    await expect(repository.ensure(ids.user, ids.thought)).resolves.toMatchObject({
+      created: true,
+      thought: { id: ids.thought },
+    })
+    expect(rpc).toHaveBeenCalledWith('retniw_ensure_thought', {
+      target_user_id: ids.user,
+      target_thought_id: ids.thought,
+    })
+  })
+
+  it('does not recreate an identity that has a deletion tombstone', async () => {
+    const client = {
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: { code: 'P0001', message: 'RETNIW_THOUGHT_DELETED' },
+      })),
+    } as unknown as SupabaseClient
+
+    await expect(new ThoughtRepository(client).ensure(ids.user, ids.thought))
+      .rejects.toMatchObject({ status: 409, code: 'THOUGHT_DELETED' })
+  })
+
+  it('ships one shared database lock for create and physical delete identities', async () => {
+    const migration = await readFile(
+      'supabase/migrations/20260903143000_thought_identity_tombstones.sql',
+      'utf8',
+    )
+
+    expect(migration).toContain('create table public.deleted_thought_tombstones')
+    expect(migration.match(/pg_advisory_xact_lock/g)).toHaveLength(2)
+    expect(migration).toMatch(/retniw_delete_thought[\s\S]*insert into public\.deleted_thought_tombstones[\s\S]*delete from public\.thoughts/)
+    expect(migration).toContain('grant execute on function public.retniw_ensure_thought(uuid, uuid) to service_role')
+  })
+
+  it('guards legacy direct writes during deployment and rollback windows', async () => {
+    const migration = await readFile(
+      'supabase/migrations/20260904084500_thought_identity_trigger_guards.sql',
+      'utf8',
+    )
+
+    expect(migration).toContain('security definer')
+    expect(migration).toContain('set search_path = public, pg_temp')
+    expect(migration).toContain('pg_advisory_xact_lock')
+    expect(migration).toMatch(/if tg_op = 'INSERT'[\s\S]*RETNIW_THOUGHT_DELETED/)
+    expect(migration).toMatch(/insert into public\.deleted_thought_tombstones[\s\S]*return old/)
+    expect(migration).toContain('before insert or delete on public.thoughts')
+  })
+
+  it('keeps account deletion compatible with the thought identity trigger', async () => {
+    const migration = await readFile(
+      'supabase/migrations/20260904091000_thought_identity_account_delete_guard.sql',
+      'utf8',
+    )
+
+    expect(migration).toMatch(/if exists \(select 1 from auth\.users where id = target_user_id\) then[\s\S]*insert into public\.deleted_thought_tombstones/)
+    expect(migration).toContain('return old;')
+  })
+
   it('applies move and archive actions idempotently without replacing state timestamps', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-22T01:00:00.000Z'))
@@ -282,7 +360,7 @@ describe('deleted thought guards', () => {
       clientRequestId: ids.entry,
       entryType: 'user',
       content: '不会写入',
-    })).rejects.toMatchObject({ status: 409, code: 'STATE_CONFLICT' })
+    })).rejects.toMatchObject({ status: 409, code: 'THOUGHT_DELETED' })
 
     await expect(new CheckpointRepository(client).createIdempotent({
       id: ids.entry,

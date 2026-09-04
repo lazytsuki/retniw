@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiError } from '@/src/lib/api-error'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import {
   ThoughtConnectionRepository,
@@ -14,7 +14,7 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { id: rawId } = await params
     const id = requireUuid(rawId, 'id')
     const body = (await request.json().catch(() => null)) as { decision?: unknown } | null

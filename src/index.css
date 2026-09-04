@@ -7,6 +7,11 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --accent: #bfd8d0;
+  --focus-ring: #bfd8d0;
+  --text-primary: rgb(248 248 245 / 92%);
+  --text-secondary: rgb(245 245 243 / 72%);
+  --text-muted: rgb(245 245 243 / 58%);
+  --text-subtle: rgb(245 245 243 / 55%);
 }
 
 * {
@@ -43,6 +48,87 @@ body::before {
   content: "";
   opacity: 0.025;
   pointer-events: none;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 200;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #eef1ed;
+  color: #101315;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 20px));
+  transition: transform 140ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.visually-hidden,
+.visually-hidden-file-input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
+[data-pointer-glow] {
+  --pointer-glow-x: 50%;
+  --pointer-glow-y: 50%;
+  position: relative;
+  isolation: isolate;
+}
+
+[data-pointer-glow]::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    260px circle at var(--pointer-glow-x) var(--pointer-glow-y),
+    rgb(191 216 208 / 8%),
+    transparent 72%
+  );
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+[data-pointer-glow="capture"]::before {
+  background: radial-gradient(
+    420px circle at var(--pointer-glow-x) var(--pointer-glow-y),
+    rgb(191 216 208 / 10%),
+    transparent 70%
+  );
+}
+
+[data-pointer-glow="navigation"]::before {
+  background: radial-gradient(
+    190px circle at var(--pointer-glow-x) var(--pointer-glow-y),
+    rgb(191 216 208 / 5%),
+    transparent 74%
+  );
+}
+
+[data-pointer-glow][data-pointer-glow-active="true"]::before {
+  opacity: 1;
+}
+
+[data-pointer-glow] > * {
+  position: relative;
+  z-index: 1;
 }
 
 button,
@@ -136,7 +222,7 @@ a {
 .sidebar-expand-action {
   border: 0;
   background: transparent;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-subtle);
   cursor: pointer;
 }
 
@@ -264,7 +350,7 @@ a {
 .account-menu__identity > span,
 .account-menu__nickname-form > label,
 .account-menu__hint {
-  color: rgb(245 245 243 / 36%);
+  color: var(--text-subtle);
   font-size: 11px;
 }
 
@@ -387,7 +473,7 @@ a {
 .recent h2,
 .section-label {
   margin: 0 0 16px;
-  color: rgb(245 245 243 / 48%);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 520;
   letter-spacing: 0.04em;
@@ -441,7 +527,7 @@ a {
 
 textarea::placeholder,
 input::placeholder {
-  color: rgb(245 245 243 / 27%);
+  color: var(--text-subtle);
 }
 
 .capture-actions {
@@ -456,7 +542,7 @@ input::placeholder {
 .capture-actions > span {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-subtle);
   font-size: 13px;
 }
 
@@ -550,13 +636,13 @@ a.fragment-card:hover {
 .fragment-meta {
   display: block;
   margin-top: 8px;
-  color: rgb(245 245 243 / 36%);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
 .fragment-card > svg {
   width: 17px;
-  color: rgb(245 245 243 / 28%);
+  color: var(--text-subtle);
 }
 
 .fragment-card--pending {
@@ -625,10 +711,41 @@ a.fragment-card:hover {
 
 .workspace-kicker {
   margin: 0;
-  color: rgb(245 245 243 / 46%);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 560;
   letter-spacing: 0.04em;
+}
+
+.workspace-import-action {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgb(191 216 208 / 18%);
+  border-radius: 999px;
+  background: rgb(191 216 208 / 6%);
+  color: rgb(230 238 234 / 78%);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.workspace-import-action:hover {
+  border-color: rgb(191 216 208 / 32%);
+  background: rgb(191 216 208 / 10%);
+  color: rgb(238 244 241 / 94%);
+}
+
+.workspace-import-action svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.65;
 }
 
 .workspace-heading h1 {
@@ -655,7 +772,7 @@ a.fragment-card:hover {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-subtle);
   cursor: pointer;
 }
 
@@ -720,7 +837,7 @@ a.fragment-card:hover {
 
 .thought-menu__panel .export-menu span {
   padding: 6px 10px;
-  color: rgb(245 245 243 / 34%);
+  color: var(--text-subtle);
   font-size: 11px;
 }
 
@@ -728,7 +845,7 @@ a.fragment-card:hover {
   padding: 0;
   border: 0;
   background: transparent;
-  color: rgb(245 245 243 / 44%);
+  color: var(--text-muted);
   font: inherit;
   font-size: 12px;
   text-decoration: none;
@@ -825,7 +942,7 @@ a.fragment-card:hover {
 .all-thoughts h2,
 .thought-history-dialog h2 {
   margin: 0 0 13px;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 560;
   letter-spacing: 0.04em;
@@ -835,7 +952,7 @@ a.fragment-card:hover {
 .thought-list-loading,
 .thought-list-error {
   margin: 10px 3px;
-  color: rgb(245 245 243 / 35%);
+  color: var(--text-subtle);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -851,7 +968,7 @@ a.fragment-card:hover {
   border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 11px;
   background: transparent;
-  color: rgb(245 245 243 / 48%);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -986,7 +1103,7 @@ a.fragment-card:hover {
 .collection-link button {
   border: 0;
   background: transparent;
-  color: rgb(245 245 243 / 44%);
+  color: var(--text-muted);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -1025,8 +1142,9 @@ a.fragment-card:hover {
   display: grid;
   gap: 4px;
   margin-top: 20px;
-  padding-top: 14px;
+  padding: 14px 0 0 12px;
   border-top: 1px solid rgb(255 255 255 / 7%);
+  border-left: 1px solid rgb(191 216 208 / 9%);
 }
 
 .thought-navigation__sections section {
@@ -1037,7 +1155,7 @@ a.fragment-card:hover {
 
 .thought-navigation__sections h3 {
   margin: 0 0 5px;
-  color: rgb(245 245 243 / 30%);
+  color: var(--text-subtle);
   font-size: 11px;
   font-weight: 520;
 }
@@ -1127,7 +1245,7 @@ a.fragment-card:hover {
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: rgb(245 245 243 / 44%);
+  color: var(--text-muted);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -1230,6 +1348,15 @@ a.fragment-card:hover {
   border-bottom: 1px solid rgb(255 255 255 / 8%);
 }
 
+.thought-entry:target,
+.thought-entry--target {
+  margin-inline: -12px;
+  padding-inline: 16px;
+  border-radius: 12px;
+  background: rgb(191 216 208 / 6%);
+  box-shadow: inset 3px 0 0 rgb(191 216 208 / 44%);
+}
+
 #current-thought,
 .thought-entry[id] {
   scroll-margin-top: 72px;
@@ -1320,19 +1447,47 @@ a.fragment-card:hover {
   background: transparent;
 }
 
-.entry-content--markdown table {
-  display: block;
+.entry-table-scroll {
   max-width: 100%;
+  margin: 0.9em 0;
   overflow-x: auto;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 12px;
+  background: rgb(0 0 0 / 16%);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(191 216 208 / 24%) transparent;
+}
+
+.entry-content--markdown .entry-table-scroll table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
   border-collapse: collapse;
   font-size: 0.86em;
 }
 
 .entry-content--markdown th,
 .entry-content--markdown td {
-  padding: 7px 10px;
-  border: 1px solid rgb(255 255 255 / 10%);
+  padding: 9px 11px;
+  border-right: 1px solid rgb(255 255 255 / 8%);
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
   text-align: left;
+}
+
+.entry-content--markdown th {
+  background: rgb(255 255 255 / 6%);
+  color: var(--text-primary);
+  font-weight: 620;
+}
+
+.entry-content--markdown tbody tr:nth-child(even) {
+  background: rgb(255 255 255 / 2.5%);
+}
+
+@media (hover: hover) {
+  .entry-content--markdown tbody tr:hover {
+    background: rgb(191 216 208 / 5%);
+  }
 }
 
 .entry-copy {
@@ -1381,6 +1536,13 @@ a.fragment-card:hover {
   font-weight: 540;
 }
 
+.import-dialog__description {
+  margin: -6px 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .import-dialog__header button,
 .import-dialog__submit,
 .file-button {
@@ -1407,7 +1569,7 @@ a.fragment-card:hover {
 .import-dialog__row {
   gap: 12px;
   margin-top: 12px;
-  color: rgb(245 245 243 / 35%);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -1417,15 +1579,21 @@ a.fragment-card:hover {
   border-radius: 999px;
 }
 
-.file-button input {
-  display: none;
+.file-button[aria-disabled="true"] {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.file-button:has(+ .visually-hidden-file-input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
 .import-dialog__field {
   display: grid;
   gap: 7px;
   margin-top: 18px;
-  color: rgb(245 245 243 / 44%);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -1449,7 +1617,7 @@ a.fragment-card:hover {
 
 .import-dialog legend {
   margin-right: 14px;
-  color: rgb(245 245 243 / 38%);
+  color: var(--text-subtle);
 }
 
 .import-dialog fieldset label {
@@ -1480,7 +1648,7 @@ a.fragment-card:hover {
 
 .entry-source {
   margin: 0 0 8px;
-  color: rgb(245 245 243 / 38%);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -1499,10 +1667,14 @@ a.fragment-card:hover {
   stroke-width: 1.6;
 }
 
-.thought-entry--assist {
-  margin-left: 26px;
-  padding-left: 17px;
-  border-left: 1px solid rgb(191 216 208 / 16%);
+.thought-entry--assist,
+.thought-entry--ai-live {
+  margin: 8px 0 8px 20px;
+  padding: 20px 18px;
+  border: 1px solid rgb(191 216 208 / 11%);
+  border-left: 2px solid rgb(191 216 208 / 34%);
+  border-radius: 0 14px 14px 0;
+  background: rgb(191 216 208 / 3.5%);
 }
 
 .thought-composer textarea {
@@ -1535,13 +1707,13 @@ a.fragment-card:hover {
 }
 
 .thought-composer textarea::placeholder {
-  color: rgb(245 245 243 / 46%);
+  color: var(--text-muted);
 }
 
 .sync-status {
   min-height: 20px;
   margin: 12px 4px 0;
-  color: rgb(245 245 243 / 34%);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -1553,11 +1725,57 @@ a.fragment-card:hover {
   color: #d5a09a;
 }
 
+.sync-status--legacy {
+  display: grid;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid rgb(191 216 208 / 14%);
+  border-radius: 12px;
+  background: rgb(191 216 208 / 4%);
+  line-height: 1.6;
+}
+
+.sync-status--legacy button {
+  justify-self: start;
+}
+
 .sync-status button {
   padding: 5px 11px;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 999px;
   background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.auth-context-notice {
+  position: fixed;
+  z-index: 120;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  display: flex;
+  width: min(calc(100% - 32px), 560px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid rgb(213 160 154 / 34%);
+  border-radius: 14px;
+  background: rgb(30 23 23 / 96%);
+  box-shadow: 0 16px 50px rgb(0 0 0 / 44%);
+  color: #f1d6d2;
+  font-size: 13px;
+  line-height: 1.5;
+  transform: translateX(-50%);
+}
+
+.auth-context-notice button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid rgb(241 214 210 / 28%);
+  border-radius: 999px;
+  background: rgb(241 214 210 / 9%);
   color: inherit;
   cursor: pointer;
 }
@@ -1610,7 +1828,7 @@ a.fragment-card:hover {
 
 .thinking-assist p {
   margin: 0;
-  color: rgb(245 245 243 / 34%);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -1625,12 +1843,11 @@ a.fragment-card:hover {
 
 .thought-entry--ai-live {
   margin-bottom: 22px;
-  padding-inline: 4px;
   border-bottom-style: dashed;
 }
 
 .ai-waiting {
-  color: rgb(245 245 243 / 42%) !important;
+  color: var(--text-muted) !important;
 }
 
 .ai-unsaved {
@@ -1655,7 +1872,7 @@ a.fragment-card:hover {
 
 .thought-recent h2 {
   margin: 0 0 16px;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 520;
   letter-spacing: 0.04em;
@@ -1794,7 +2011,7 @@ a.fragment-card:hover {
 }
 
 .thought-link time {
-  color: rgb(245 245 243 / 30%);
+  color: var(--text-subtle);
   font-size: 11px;
 }
 
@@ -1814,7 +2031,7 @@ a.fragment-card:hover {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-subtle);
   cursor: pointer;
   opacity: 0;
 }
@@ -1916,7 +2133,7 @@ a.fragment-card:hover {
 
 .collection-picker > p {
   margin: 3px 10px 6px;
-  color: rgb(245 245 243 / 36%);
+  color: var(--text-subtle);
   font-size: 11px;
 }
 
@@ -1926,7 +2143,7 @@ a.fragment-card:hover {
 
 .collection-picker-layer__status {
   margin: 6px 8px 2px;
-  color: rgb(245 245 243 / 44%);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
@@ -2015,7 +2232,7 @@ a.fragment-card:hover {
   gap: 11px;
   margin: 4px 0;
   padding: 10px 4px;
-  color: rgb(245 245 243 / 34%);
+  color: var(--text-subtle);
   font-size: 11px;
 }
 
@@ -2066,7 +2283,7 @@ a.fragment-card:hover {
 .confirm-dialog p,
 .checkpoint-dialog label,
 .checkpoint-dialog > p {
-  color: rgb(245 245 243 / 48%);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -2112,7 +2329,7 @@ a.fragment-card:hover {
 
 .checkpoint-dialog header > button {
   background: transparent;
-  color: rgb(245 245 243 / 46%);
+  color: var(--text-muted);
 }
 
 .checkpoint-dialog label {
@@ -2225,7 +2442,7 @@ a.fragment-card:hover {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  color: rgb(245 245 243 / 48%);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -2254,7 +2471,7 @@ a.fragment-card:hover {
 .session {
   display: block;
   margin-top: 32px;
-  color: rgb(245 245 243 / 34%);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -2346,7 +2563,7 @@ a.fragment-card:hover {
 .timeline-progress,
 .timeline-complete {
   margin: 0;
-  color: rgb(245 245 243 / 48%);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -2447,7 +2664,7 @@ a.fragment-card:hover {
 .auth-mode-switch a {
   padding: 7px 11px;
   border-radius: 8px;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-muted);
   font-size: 12px;
   text-decoration: none;
 }
@@ -2459,7 +2676,7 @@ a.fragment-card:hover {
 
 .muted {
   margin: 10px 0 0;
-  color: rgb(245 245 243 / 42%);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -2532,7 +2749,7 @@ a.fragment-card:hover {
 .login-form label {
   display: grid;
   gap: 8px;
-  color: rgb(245 245 243 / 48%);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -2567,7 +2784,7 @@ a.fragment-card:hover {
 
 .login-note {
   margin: 22px 0 0;
-  color: rgb(245 245 243 / 34%);
+  color: var(--text-subtle);
   font-size: 11px;
   line-height: 1.6;
 }
@@ -2846,7 +3063,8 @@ a.fragment-card:hover {
     gap: 8px;
   }
 
-  .thought-entry--assist {
+  .thought-entry--assist,
+  .thought-entry--ai-live {
     margin-left: 10px;
     padding-left: 13px;
   }
@@ -2915,4 +3133,17 @@ a.fragment-card:hover {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 3px;
+}
+
+main:focus-visible {
+  outline: none !important;
 }

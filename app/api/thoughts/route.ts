@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser, requireRequestUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { EntryRepository } from '@/src/server/repositories/entry-repository'
 import { decodeThoughtCursor, ThoughtRepository } from '@/src/server/repositories/thought-repository'
@@ -14,7 +14,7 @@ export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const input = parseThoughtInput(await request.json().catch(() => null))
     const client = createServiceClient()
     const thoughts = new ThoughtRepository(client)
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser()
+    const user = await requireRequestUser(request)
     const cursorValue = request.nextUrl.searchParams.get('cursor')
     const scopeValue = request.nextUrl.searchParams.get('scope') ?? 'active'
     const collectionId = request.nextUrl.searchParams.get('collectionId') ?? undefined

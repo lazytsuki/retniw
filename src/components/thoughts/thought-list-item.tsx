@@ -8,6 +8,7 @@ import type { ThoughtCollection } from '@/src/server/repositories/collection-rep
 import { isMarkdownContent, markdownToPlainText } from '@/src/lib/markdown'
 import { ArchiveIcon, TrashIcon, ThoughtActionMenu, type ThoughtAction } from './thought-action-menu'
 import { useOverlayController } from '@/src/components/overlay-provider'
+import { usePointerGlow } from '@/src/hooks/use-pointer-glow'
 
 function excerpt(thought: ThoughtSummary) {
   if (!thought.firstEntry) return '以前的想法'
@@ -58,6 +59,7 @@ export function ThoughtListItem({
   const longPressOpened = useRef(false)
   const suppressClick = useRef(false)
   const overlay = useOverlayController()
+  const pointerGlow = usePointerGlow<HTMLDivElement>()
   const menuId = `thought-actions:${menuScope}:${thought.id}`
   const pickerId = `thought-move:${menuScope}:${thought.id}`
   const triggerId = `thought-action-trigger:${menuScope}:${thought.id}`
@@ -151,12 +153,17 @@ export function ThoughtListItem({
           active ? 'thought-list-item__surface--active' : '',
           navigating ? 'thought-list-item__surface--pending' : '',
         ].filter(Boolean).join(' ')}
+        data-pointer-glow="navigation"
         style={{
           transform: `translateX(${offset}px)`,
           transition: itemOverlayOpen ? 'none' : undefined,
         }}
         onPointerDown={pointerDown}
-        onPointerMove={pointerMove}
+        onPointerMove={(event) => {
+          pointerMove(event)
+          pointerGlow.onPointerMove(event)
+        }}
+        onPointerLeave={pointerGlow.onPointerLeave}
         onPointerUp={pointerEnd}
         onPointerCancel={pointerEnd}
       >
@@ -205,6 +212,7 @@ export function ThoughtListItem({
         </Link>
         <ThoughtActionMenu
           thought={thought}
+          actionLabel={excerpt(thought)}
           menuScope={menuScope}
           collections={collections}
           mode={mode}

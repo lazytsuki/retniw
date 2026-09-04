@@ -21,7 +21,8 @@ describe('account menu', () => {
     ])
 
     for (const page of pages) {
-      expect(page).toContain('<AppHeader account={{ email: user.email, nickname: user.nickname }} />')
+      expect(page).toMatch(/<AppHeader account=\{\{ email: user\.email, nickname: user\.nickname \}\} userId=\{user(?:Id|\.id)\} \/>/)
+      expect(page).toContain('data-retniw-user-id=')
     }
   })
 })

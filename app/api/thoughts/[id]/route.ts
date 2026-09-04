@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser, requireUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { ThoughtRepository } from '@/src/server/repositories/thought-repository'
 import { parseThoughtAction, requireUuid } from '@/src/server/thoughts/parse-thought-management'
@@ -23,7 +23,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { id: rawId } = await params
     const id = requireUuid(rawId, 'id')
     const action = parseThoughtAction(await request.json().catch(() => null))
@@ -34,9 +34,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(request: Request, { params }: RouteContext) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const { id: rawId } = await params
     const id = requireUuid(rawId, 'id')
     await new ThoughtRepository(createServiceClient()).deleteOwned(user.id, id)

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect } from 'react'
 
-const REDIRECT_DELAY_MS = 500
+const REDIRECT_DELAY_MS = 1800
 
 export function AccountCreatedTransition() {
   useEffect(() => {
@@ -12,7 +12,7 @@ export function AccountCreatedTransition() {
   }, [])
 
   return (
-    <main className="shell auth-transition-shell">
+    <main className="shell auth-transition-shell" id="main-content" tabIndex={-1}>
       <section className="panel panel--compact auth-transition" aria-labelledby="auth-transition-title">
         <p className="auth-transition__mark" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 7" /></svg>

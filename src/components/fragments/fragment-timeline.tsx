@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { currentUserBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 import { ClarificationCard } from '@/src/components/fragments/clarification-card'
 import { ConnectionCandidate } from '@/src/components/fragments/connection-candidate'
 import type { FragmentDetailRepository } from '@/src/server/repositories/fragment-detail-repository'
@@ -22,7 +23,7 @@ export function FragmentTimeline({ initialFragment }: { initialFragment: Fragmen
   const requestedReconnect = useRef(false)
 
   const refresh = useCallback(async () => {
-    const response = await fetch(`/api/fragments/${initialFragment.id}`)
+    const response = await currentUserBoundFetch(`/api/fragments/${initialFragment.id}`)
     if (!response.ok) return null
     const result = (await response.json()) as { data: { fragment: FragmentDetail } }
     setFragment(result.data.fragment)
@@ -34,7 +35,7 @@ export function FragmentTimeline({ initialFragment }: { initialFragment: Fragmen
     requestedClarification.current = true
     setPhase('clarifying')
     try {
-      const response = await fetch(`/api/fragments/${initialFragment.id}/clarification`, { method: 'POST' })
+      const response = await currentUserBoundFetch(`/api/fragments/${initialFragment.id}/clarification`, { method: 'POST' })
       if (!response.ok) throw new Error('CLARIFY_FAILED')
       await refresh()
       setPhase('idle')
@@ -48,7 +49,7 @@ export function FragmentTimeline({ initialFragment }: { initialFragment: Fragmen
     requestedReconnect.current = true
     setPhase('reconnecting')
     try {
-      const response = await fetch(`/api/fragments/${initialFragment.id}/reconnect`, { method: 'POST' })
+      const response = await currentUserBoundFetch(`/api/fragments/${initialFragment.id}/reconnect`, { method: 'POST' })
       if (!response.ok) throw new Error('RECONNECT_FAILED')
       await refresh()
       setPhase('idle')

@@ -77,7 +77,7 @@ export class EntryRepository {
 
     if (!error && data) return { entry: toEntry(data), created: true }
     if (isUnwritableThoughtError(error)) {
-      throw new ApiError(409, 'STATE_CONFLICT', 'Thought is no longer writable')
+      throw new ApiError(409, 'THOUGHT_DELETED', 'Thought is no longer writable')
     }
     if (error?.code !== '23505') {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to save entry')

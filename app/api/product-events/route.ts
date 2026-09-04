@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiError } from '@/src/lib/api-error'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireMutationUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { ProductEventRepository } from '@/src/server/repositories/product-event-repository'
 
@@ -16,7 +16,7 @@ type ProductEventBody = {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser()
+    const user = await requireMutationUser(request)
     const body = await request.json().catch(() => null) as ProductEventBody | null
     if (!body || typeof body.eventName !== 'string') {
       throw new ApiError(400, 'INVALID_INPUT', 'Invalid product event')

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiError } from '@/src/lib/api-error'
 import { apiErrorResponse } from '@/src/lib/api-response'
-import { requireUser } from '@/src/lib/auth/require-user'
+import { requireRequestUser } from '@/src/lib/auth/require-user'
 import { createServiceClient } from '@/src/lib/supabase/service'
 import { ReviewPreferenceRepository } from '@/src/server/repositories/review-preference-repository'
 import {
@@ -14,7 +14,7 @@ export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser()
+    const user = await requireRequestUser(request)
     const statusValue = request.nextUrl.searchParams.get('status') ?? 'pending'
     if (statusValue !== 'pending' && statusValue !== 'confirmed') {
       throw new ApiError(400, 'INVALID_INPUT', 'status 无效')

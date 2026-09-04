@@ -18,7 +18,11 @@ vi.mock('next/server', async (importOriginal) => ({
   ...await importOriginal<typeof import('next/server')>(),
   after: mocks.scheduleAfter,
 }))
-vi.mock('@/src/lib/auth/require-user', () => ({ requireUser: mocks.requireUser }))
+vi.mock('@/src/lib/auth/require-user', () => ({
+  requireMutationUser: mocks.requireUser,
+  requireRequestUser: mocks.requireUser,
+  requireUser: mocks.requireUser,
+}))
 vi.mock('@/src/lib/supabase/service', () => ({ createServiceClient: () => ({}) }))
 vi.mock('@/src/server/repositories/review-preference-repository', () => ({
   ReviewPreferenceRepository: class {

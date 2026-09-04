@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { currentUserBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 import type { Connection } from '@/src/server/repositories/fragment-detail-repository'
 
 type Props = { connection: Connection; onDecided: (status: 'confirmed' | 'rejected') => void }
@@ -14,7 +15,7 @@ export function ConnectionCandidate({ connection, onDecided }: Props) {
     setSaving(true)
     setMessage('')
     try {
-      const response = await fetch(`/api/connections/${connection.id}`, {
+      const response = await currentUserBoundFetch(`/api/connections/${connection.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ decision }),

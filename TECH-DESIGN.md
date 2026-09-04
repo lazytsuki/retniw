@@ -9,6 +9,8 @@
 | [`ThoughtNavigation`](src/components/thoughts/thought-navigation.tsx#ThoughtNavigation) | 工作区导航 | 最近内容为历史根；合集、归档、回看为次级入口；不提供已删除视图 |
 | `AppHeader`、`app/auth/created`、`app/account/actions.ts` | 账号入口 | 创建成功先进入轻量过渡页；顶栏回显邮箱并编辑昵称 |
 | [`ThoughtComposer`](src/components/thoughts/thought-composer.tsx#ThoughtComposer) | 内容输入 | 初始记录与继续写复用同一组件，通过`data-mode`切换文案和可编辑表面强度 |
+| `thought_outbox`、[`useCaptureOutbox`](src/hooks/use-capture-outbox.ts#useCaptureOutbox) | 本机保存 | 按`userId`隔离草稿和待同步内容；同一想法按创建顺序发送，旧版无归属记录需由当前用户确认后恢复 |
+| `x-retniw-expected-user-id`、`expectedUserId`、[`requireRequestUser`](src/lib/auth/require-user.ts#requireRequestUser) | 页面账号围栏 | 客户端读取和写入通过请求头携带页面账号；导出先用请求头预检，再通过同源查询参数保持浏览器原生流式下载。Cookie已切换时返回`AUTH_CONTEXT_CHANGED`，全局提示刷新，不读取或修改另一账号数据 |
 | [`ThoughtListItem`](src/components/thoughts/thought-list-item.tsx#ThoughtListItem)、[`ThoughtActionMenu`](src/components/thoughts/thought-action-menu.tsx#ThoughtActionMenu) | 内容管理 | 删除经强确认后调用 HTTP DELETE，不提供恢复 |
 | `app/review`、`ReviewWorkspace` | 跨想法回看 | 承接主动串联、开启说明、联系候选和已保留联系，不提供聊天输入 |
 | `POST /api/review/scan`、`ReviewService.scanExistingThoughts` | 主动串联 | 扫描最多20条既有想法，候选复用唯一关系真相源 |
@@ -19,15 +21,16 @@
 | [`ThoughtConnectionRepository.listForReview`](src/server/repositories/thought-connection-repository.ts#listForReview)、[`countForReview`](src/server/repositories/thought-connection-repository.ts#countForReview) | 联系读取 | 四个精确外键内连接先过滤可见关系，再分页、计数并直接序列化 |
 | `product_events`、`POST /api/product-events` | 使用行为 | 固定记录工作区、回看、主动串联结果和联系原文打开事件；事件失败不阻断产品动作 |
 | [`scripts/report-product-metrics.mjs`](scripts/report-product-metrics.mjs) | 聚合指标 | 用户输入与导入分开统计，输出24小时首次用户输入、跨日继续、AI保存结果、回看和联系使用情况，不输出用户或内容标识 |
-| [`ThoughtRepository`](src/server/repositories/thought-repository.ts#ThoughtRepository)、[`ThoughtExportRepository`](src/server/repositories/thought-export-repository.ts#ThoughtExportRepository) | 生命周期与导出 | 删除物理执行；历史软删除行保持隐藏并从回看、合集和导出排除 |
+| [`ThoughtRepository`](src/server/repositories/thought-repository.ts#ThoughtRepository)、`deleted_thought_tombstones`、[`ThoughtExportRepository`](src/server/repositories/thought-export-repository.ts#ThoughtExportRepository) | 生命周期与导出 | 正文及关联数据物理删除；仅保留账号与想法ID组成的删除墓碑，历史软删除行保持隐藏 |
 
 - 产品状态只分三层：用户原文是记录，AI产出的是联系候选，用户保留后才进入回看中的长期联系；不使用图数据库或回看快照表。
 - 当前想法中的“帮我接着想”和“整理”只在用户主动调用时使用当前想法；后台能力只负责跨想法比较，不生成正文、不续写、不分类。
 - 昵称保存在 Supabase Auth `user_metadata.nickname`中，是受限称呼标签，不进入关系匹配，也不能被当作提示词指令。
+- 本机outbox、客户端请求和账号Action使用同一页面账号快照。跨标签切换账号后，旧页面不再读取或写入新账号；未同步正文保留在原账号本机队列，刷新后按当前账号重新建立页面状态。
 - 回看默认关闭。后台任务先读取用户级开关，只有已开启才读取并发送必要的新旧用户原文；关闭后新保存不再触发比较。
 - `thought_connections`是唯一关系真相源；同一对想法沿用规范化顺序和唯一约束。`pending / confirmed`持续阻止重复候选；`rejected`在两端没有新增user/import entry时阻止重复候选，有新内容后可以复用原记录重新进入`pending`。
 - 归档是“以前的想法”的子视图，仍可参与跨想法比较；`deleted_at is not null`的历史行在所有产品读取中排除且不自动清理。
-- 新删除由`DELETE /api/thoughts/:id`物理执行，只命中`deleted_at is null`且属于当前用户的行；`PATCH`不再承担删除或恢复。
+- 新删除由`DELETE /api/thoughts/:id`调用数据库事务函数物理执行，只命中`deleted_at is null`且属于当前用户的行；同一事务先写入不含正文的删除墓碑，阻止结果不明的旧创建请求复活该ID。`PATCH`不再承担删除或恢复。
 - 保存后的回看使用 Next.js 16 `after()`；Vercel通过`waitUntil`延长函数生命周期，回调受路由`maxDuration`限制，因此失败只能降级为本次不产出候选，不能反向改变保存结果。每个user/import entry用自己的`review_checked_at`独立原子认领：同一entry重试只处理一次，不同entry即使回调乱序也各自处理。
 - 数据库方言为`postgresql`；用户回看偏好保存在独立表中，entry使用可空认领列记录回看处理状态。
 
@@ -82,7 +85,7 @@ flowchart TD
 
 - 需求/验收：所有删除入口都先强提醒，确认后无法恢复，想法、内容和相关联系不可再读取。
 - 实现目标：`retniw-web`，统一桌面更多/右键和移动左滑/长按的危险操作语义。
-- 实现：不提供`deleted`模式、恢复图标或恢复动作。所有删除入口只打开同一个模态框，标题“删除这个想法？”，正文“删除后无法恢复，相关联系也会一并删除。”，按钮“取消 / 删除”。确认按钮提交期间禁用；收到204后乐观移除并在删除当前想法时进入`/`，失败则恢复条目并保留重试提示。
+- 实现：不提供`deleted`模式、恢复图标或恢复动作。所有删除入口只打开同一个模态框，标题“删除这个想法？”，正文“删除后无法恢复，相关联系也会一并删除。”，按钮“取消 / 删除”。确认按钮提交期间禁用；收到204或重复删除的404后，按当前账号记录本机删除墓碑并清理该想法的待同步内容，再从界面移除；失败则恢复条目并保留结果未确认提示。
 - 相关符号：`ThoughtActionMenu`、`ThoughtListItem`、`ThoughtNavigation.performAction`、删除确认`dialog`
 - 验证入口：更多、右键、左滑、长按分别触发；取消不发请求；重复点击只发一次DELETE；成功后前进、后退、直接访问原链接均无法读取。
 - 边界与不变约束：手势只揭示“删除”，不能绕过确认；删除合集仍是另一条只解除归属的契约。
@@ -91,7 +94,7 @@ flowchart TD
 
 - 需求/验收：首次开启前说明处理范围；候选可回到两端原文，保留的联系可再次打开；页面不被理解为聊天。
 - 实现目标：`retniw-web`使用动态路由`/review`和`ReviewWorkspace`，并复用应用顶栏、历史导航、SVG线条与颜色变量。
-- 实现：当前想法正文旁只提供一个跳往`/review`的“串联已有想法”链接，不把跨想法能力伪装成当前想法AI。`/review`主区先提供主动串联入口，再按“等你判断 / 已保留”两层展示；每张候选按锚点时间并列显示最多1000字的“后来写的 / 更早写的”原文摘录、简短依据和“保留 / 忽略”。两端均链接`/thoughts/:id#entry-:entryId`，正文entry提供稳定DOM锚点。没有候选时只显示事实空态，不生成总结或推荐话术。
+- 实现：跨想法能力只从导航进入`/review`，不与当前想法AI并列，避免重复入口。`/review`主区先提供主动串联入口，再按“等你判断 / 已保留”两层展示；每张候选按锚点时间并列显示最多1000字的“后来写的 / 更早写的”原文摘录、简短依据和“保留 / 忽略”。两端均链接`/thoughts/:id#entry-:entryId`；打开后目标entry获得焦点与克制高亮。没有候选时只显示事实空态，不生成总结或推荐话术。
 - 相关符号：`app/review/page.tsx`、`ReviewWorkspace`、`ConnectionCard`、`ThoughtNavigation`、`ThoughtWorkspace`、entry DOM锚点
 - 验证入口：未开启、已开启无候选、有候选、有已保留联系、分页失败分别回放；手机和桌面都能从“以前的想法”进入并回到两端原文。
 - 边界与不变约束：页面没有输入框；待判断数量只在回看入口旁克制提示，不弹窗、不抢焦点、不阻断记录。
@@ -100,7 +103,7 @@ flowchart TD
 
 - 需求/验收：默认关闭，明确开启后才发送跨想法内容，关闭后新保存不再处理。
 - 实现目标：`retniw-web`，用一个可访问的开关表达真实状态，不使用一次性浏览器标记。
-- 实现：首次进入关闭状态时显示处理范围和“开启并开始串联”按钮；点击后先持久化偏好，只有偏好成功开启才调用主动扫描。已开启时提供“开始串联”和“关闭回看”，偏好更新失败恢复原状态。登录页同步说明：主动使用当前想法AI，或开启回看后，必要内容会交给DeepSeek处理。
+- 实现：首次进入关闭状态时显示处理范围和“开启并开始串联”按钮；点击后先持久化偏好，只有偏好成功开启才调用主动扫描。已开启时提供“再串联一次”和“暂停自动串联”，偏好保存、扫描、分页和候选判断互斥，失败保留真实服务端状态。登录页同步说明：主动使用当前想法AI，或开启回看后，必要内容会交给DeepSeek处理。
 - 相关符号：`ReviewWorkspace`内的偏好控制、`app/login/page.tsx`
 - 验证入口：新账号、已有账号、跨设备重登、开启失败和关闭失败；未开启连续保存三次时Network中没有DeepSeek回看请求。
 
@@ -119,9 +122,9 @@ flowchart TD
 
 - 需求/验收：确认后物理删除当前用户的可见想法及从属内容；历史软删除数据继续隐藏且不批量清理。
 - 实现目标：`retniw-api`，把数据生命周期从可恢复状态改为明确删除请求。
-- 实现：`ThoughtRepository.deleteOwned(userId, thoughtId)`执行带`user_id`、`id`和`deleted_at is null`条件的物理删除并检查返回行；`DELETE`成功返回204。`PATCH`只接受move/archive/unarchive；`GET /api/thoughts`只接受active/archived，所有合集、详情、回看和导出查询显式增加`deleted_at is null`。历史软删除行不能由新DELETE命中。
-- 相关符号：`ThoughtRepository.deleteOwned`、`DELETE /api/thoughts/:id`、`parseThoughtAction`、`ThoughtExportRepository`
-- 验证入口：本人可见想法删除204；重复删除、旧软删除ID和其他账号ID均404；删除后entries、checkpoints和两端connections为0；归档想法仍可删除。
+- 实现：`ThoughtRepository.deleteOwned(userId, thoughtId)`调用`retniw_delete_thought`；函数以`user_id + thought_id`取得事务级咨询锁，写入`deleted_thought_tombstones`后物理删除thought，由外键级联清理正文、检查点、联系和行为。`retniw_ensure_thought`使用同一把锁并先检查墓碑，已删除ID返回`THOUGHT_DELETED`，不会重新创建。`DELETE`成功返回204；`PATCH`只接受move/archive/unarchive；所有合集、详情、回看和导出查询继续显式排除`deleted_at is not null`的历史行。
+- 相关符号：`ThoughtRepository.ensure`、`ThoughtRepository.deleteOwned`、`retniw_ensure_thought`、`retniw_delete_thought`、`deleted_thought_tombstones`、`DELETE /api/thoughts/:id`、`ThoughtExportRepository`
+- 验证入口：本人可见想法删除204；重复删除、旧软删除ID和其他账号ID均404；删除后entries、checkpoints和两端connections为0；使用删除前相同thoughtId和请求ID重放创建返回409且不产生thought；归档想法仍可删除。
 - 边界与不变约束：不提供恢复端点，不运行历史`deleted_at is not null`清理；删除失败不在前端伪装成功。
 
 #### 用户级回看偏好
@@ -194,6 +197,17 @@ create table public.product_events (
   scan_status text,
   created_count smallint
 );
+
+create table public.deleted_thought_tombstones (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  thought_id uuid not null,
+  deleted_at timestamptz not null default now(),
+  primary key (user_id, thought_id)
+);
+
+-- retniw_ensure_thought和retniw_delete_thought对同一user_id + thought_id
+-- 使用同一事务级咨询锁。表级触发器兼容仍在运行的旧实例：删除必写墓碑，
+-- 插入前若命中墓碑则抛出RETNIW_THOUGHT_DELETED。
 ```
 
 ## 契约
@@ -237,7 +251,8 @@ type ReviewConnection = {
 
 ## 风险与运行边界
 
-- 指向`thoughts`的`entries`、`thought_checkpoints`和`thought_connections`外键必须使用`ON DELETE CASCADE`，且不能存在未纳入清理语义的其他子引用。不要用应用层多步删除绕过数据库原子性。仓库不包含基础数据表的完整初始化迁移，因此这里不写无法由仓库复现的约束名。
+- 指向`thoughts`的`entries`、`thought_checkpoints`和`thought_connections`外键必须使用`ON DELETE CASCADE`，且不能存在未纳入清理语义的其他子引用。删除墓碑只保存`user_id / thought_id / deleted_at`，随账号删除级联清理；新代码通过同一组数据库事务函数创建和删除，表级触发器同时保护旧实例直写与发布回滚，不能退回无锁的应用层多步写入。仓库不包含基础数据表的完整初始化迁移。
+- Web版本依赖`20260903143000_thought_identity_tombstones.sql`、`20260904084500_thought_identity_trigger_guards.sql`和`20260904091000_thought_identity_account_delete_guard.sql`。三条迁移必须先于Web发布完成，并验证迁移登记、RLS、函数权限、触发器启用、“直接删除后同ID直写被拒绝”和“账号删除可级联清理”；否则不得切流。
 - `after()`没有持久队列的重试保证；每条entry在模型调用前独立认领，同一entry的供应商失败不会自动重试，换来幂等重放不重复调用模型。不同entry不共享时间水位，回调乱序不会漏掉较早保存的entry。如果这一可靠性边界无法满足实际使用，再引入持久任务机制。
 - 保存后回看以源entry 2000字、20个thought摘要、每条摘要500字、最多3个结果限制模型输入和写放大；主动扫描以最多20个thought摘要与最新user/import entry、每条500字和最多3个pair为上限。`pending / confirmed`持续排除，`rejected`在任一端出现晚于决定时间的新内容后可重新判断。页面关系查询用内连接先过滤再取21条判定下一页并直接序列化20条，pending精确计数只发生在首屏。阈值调整不得改变默认关闭和原文锚点边界。
 - 首页、想法详情和回看页在服务端并行读取最近想法与合集；合集首读成功时不再水合后重复请求，首读失败时客户端只补拉一次。回看页同时并行读取偏好、pending首屏及计数、confirmed首屏，并随首个RSC响应下发，客户端只在首读失败、加载更多或操作后再请求接口。想法详情与回看路由使用各自的`loading.tsx`提供即时反馈；历史列表继续关闭全量视口预取，只在用户指向、聚焦或触摸某一条时预取该目标路由。

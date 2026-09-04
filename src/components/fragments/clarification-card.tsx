@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { currentUserBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 import type { Clarification } from '@/src/server/repositories/fragment-detail-repository'
 
 type Props = {
@@ -19,7 +20,7 @@ export function ClarificationCard({ clarification, onAnswered, onSkip }: Props) 
     setSaving(true)
     setMessage('')
     try {
-      const response = await fetch(`/api/clarifications/${clarification.id}`, {
+      const response = await currentUserBoundFetch(`/api/clarifications/${clarification.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ answer }),

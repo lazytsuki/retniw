@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { userBoundFetch } from '@/src/lib/auth/user-bound-fetch'
 import type { AiAction } from '@/src/server/ai/deepseek-text-provider'
 import type { Entry } from '@/src/server/repositories/entry-repository'
 
@@ -49,18 +50,40 @@ const initialState: AiActionState = {
   message: '',
 }
 
-export function useAiAction(onSaved: (entry: Entry) => void) {
+export type AiActionRequest = {
+  thoughtId: string
+  action: AiAction
+  clientRequestId: string
+}
+
+export function requestForAiAction(
+  previous: AiActionRequest | null,
+  thoughtId: string,
+  action: AiAction,
+  createId = () => crypto.randomUUID(),
+): AiActionRequest {
+  return previous?.thoughtId === thoughtId && previous.action === action
+    ? previous
+    : { thoughtId, action, clientRequestId: createId() }
+}
+
+export function useAiAction(userId: string, onSaved: (entry: Entry) => void) {
   const [state, setState] = useState(initialState)
+  const runningRef = useRef(false)
+  const requestRef = useRef<AiActionRequest | null>(null)
 
   const run = useCallback(
     async (thoughtId: string, action: AiAction) => {
-      if (state.status === 'streaming') return
+      if (runningRef.current) return
+      runningRef.current = true
+      const request = requestForAiAction(requestRef.current, thoughtId, action)
+      requestRef.current = request
       setState({ status: 'streaming', action, content: '', message: '' })
       try {
-        const response = await fetch(`/api/thoughts/${thoughtId}/ai`, {
+        const response = await userBoundFetch(userId, `/api/thoughts/${thoughtId}/ai`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ clientRequestId: crypto.randomUUID(), action }),
+          body: JSON.stringify({ clientRequestId: request.clientRequestId, action }),
         })
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
@@ -76,6 +99,7 @@ export function useAiAction(onSaved: (entry: Entry) => void) {
             setState((current) => ({ ...current, content: current.content + event.data.content }))
           } else if (event.event === 'saved') {
             saved = true
+            requestRef.current = null
             onSaved(event.data.entry)
             setState({ status: 'saved', action, content: '', message: '' })
           } else if (event.event === 'error') {
@@ -92,9 +116,11 @@ export function useAiAction(onSaved: (entry: Entry) => void) {
           status: 'error',
           message,
         }))
+      } finally {
+        runningRef.current = false
       }
     },
-    [onSaved, state.status],
+    [onSaved, userId],
   )
 
   const clear = useCallback(() => setState(initialState), [])

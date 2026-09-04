@@ -25,7 +25,15 @@ export async function updateNickname(
   const supabase = await createServerAuthClient()
   let currentNickname = safePreviousNickname
   try {
-    currentNickname = (await requireUser(supabase)).nickname
+    const user = await requireUser(supabase)
+    currentNickname = user.nickname
+    if (formData.get('expectedUserId') !== user.id) {
+      return {
+        status: 'error',
+        message: '账号已在其他页面切换，请刷新后继续。',
+        nickname: safePreviousNickname,
+      }
+    }
   } catch {
     return {
       status: 'error',
