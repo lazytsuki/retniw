@@ -69,6 +69,7 @@ describe('thought workspace acceptance boundaries', () => {
     expect(css).toContain('--workspace-sidebar-width: clamp(230px, 20vw, 280px)')
     expect(css).toContain('grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr)')
     expect(css).toMatch(/\.thought-layout--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*gap: 16px;/)
+    expect(css).toMatch(/@media \(min-width: 901px\) \{\s*\.thought-layout--sidebar-collapsed \.thought-main \{\s*justify-self: center;\s*\}\s*\}/)
     expect(css).toMatch(/\.app-header--sidebar-collapsed \{[\s\S]*--workspace-sidebar-width: 52px;[\s\S]*column-gap: 16px;/)
     expect(css).toMatch(/@media \(min-width: 901px\)[\s\S]*\.app-header \{[\s\S]*position: sticky/)
     expect(css).toMatch(/\.thought-sidebar \{[\s\S]*top: calc\(48px \+ var\(--thought-sidebar-top\)\)/)
@@ -229,6 +230,8 @@ describe('thought workspace acceptance boundaries', () => {
     expect(page).toContain('id="main-content" tabIndex={-1}')
     expect(css).toContain('--text-subtle: rgb(245 245 243 / 55%)')
     expect(css).toMatch(/button:focus-visible,[\s\S]*outline: 2px solid var\(--focus-ring\) !important/)
+    expect(css).toMatch(/\.capture-surface:focus-within \{[\s\S]*border-color: rgb\(191 216 208 \/ 34%\)/)
+    expect(css).toMatch(/\.thought-composer textarea:focus-visible \{\s*outline: none !important;\s*\}/)
     expect(css).not.toMatch(/color: rgb\(245 245 243 \/ (?:2\d|3\d|4\d)%\)/)
   })
 

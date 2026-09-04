@@ -694,6 +694,12 @@ a.fragment-card:hover {
   padding-top: calc(var(--thought-layout-top) - var(--thought-sidebar-top));
 }
 
+@media (min-width: 901px) {
+  .thought-layout--sidebar-collapsed .thought-main {
+    justify-self: center;
+  }
+}
+
 .export-menu {
   min-width: 0;
   display: flex;
@@ -3142,6 +3148,10 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--focus-ring) !important;
   outline-offset: 3px;
+}
+
+.thought-composer textarea:focus-visible {
+  outline: none !important;
 }
 
 main:focus-visible {
