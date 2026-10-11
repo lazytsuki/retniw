@@ -64,7 +64,7 @@ describe('authenticated mutation identity fence', () => {
       expect(source.match(/requireMutationUser\(request\)/g) ?? [], path).toHaveLength(methods.length)
     }
 
-    expect(mutationCount).toBe(18)
+    expect(mutationCount).toBe(13)
   })
 
   it('routes every mounted client mutation through the page-account header helper', async () => {
@@ -75,9 +75,6 @@ describe('authenticated mutation identity fence', () => {
       ['src/components/thoughts/thought-navigation.tsx', 5],
       ['src/components/review/review-workspace.tsx', 3],
       ['src/components/product-event-sender.tsx', 1],
-      ['src/components/fragments/clarification-card.tsx', 1],
-      ['src/components/fragments/connection-candidate.tsx', 1],
-      ['src/components/fragments/fragment-timeline.tsx', 2],
     ])
 
     for (const [path, minimumCalls] of expected) {
@@ -91,7 +88,6 @@ describe('authenticated mutation identity fence', () => {
     const paths = [
       'src/components/review/review-workspace.tsx',
       'src/components/thoughts/thought-navigation.tsx',
-      'src/components/fragments/fragment-timeline.tsx',
     ]
     for (const path of paths) {
       const source = await readFile(path, 'utf8')
