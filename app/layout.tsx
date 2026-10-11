@@ -8,7 +8,7 @@ import '@/src/index.css'
 
 export const metadata: Metadata = {
   title: 'retniw',
-  description: '想法不必完整，先留下一句。随手记下、慢慢接着写，找回原文和想法之间的联系。',
+  description: '记想法的地方。写下来，以后接着写，也能搜到。',
   applicationName: 'retniw',
   appleWebApp: {
     capable: true,

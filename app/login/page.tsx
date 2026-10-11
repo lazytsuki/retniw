@@ -35,23 +35,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="welcome-shell" id="main-content" tabIndex={-1}>
       <section className="welcome-intro" aria-labelledby="welcome-title">
         <p className="login-brand"><RetniwSymbol /><span>retniw</span></p>
-        <h1 id="welcome-title">想法不必完整，<br />先留下一句。</h1>
-        <p className="welcome-description">随手记下，慢慢接着写。回来的时候，<br className="welcome-line-break" />找回以前的原文，看看它们之间的联系。</p>
-        <div className="welcome-principles">
-          <p><span>写下</span>不需要标题，也不用先分类。</p>
-          <p><span>继续</span>自己接着写，需要时再请AI帮忙。</p>
-          <p><span>带走</span>原文和完整思考，随时可以导出。</p>
-        </div>
+        <h1 id="welcome-title">记想法的地方</h1>
+        <p className="welcome-description">想到什么就写下来。之后可以接着写，也能搜到以前写过的。</p>
       </section>
       <section className="panel welcome-account" aria-labelledby="login-title">
         <nav className="auth-mode-switch" aria-label="账号入口">
           <Link href="/login" aria-current={!isSignup ? 'page' : undefined}>登录</Link>
           <Link href="/login?mode=signup" aria-current={isSignup ? 'page' : undefined}>创建账号</Link>
         </nav>
-        <h2 id="login-title">{isSignup ? '留一个自己的空间' : '欢迎回来'}</h2>
-        <p className="muted">{isSignup ? '填写邮箱，设置自己的密码。' : '继续之前写下的内容。'}</p>
+        <h2 id="login-title">{isSignup ? '创建账号' : '登录'}</h2>
+        {isSignup ? <p className="muted">用邮箱注册，密码自己设。</p> : null}
         {notice === 'check-email' ? (
-          <p className="auth-notice" role="status">请查收确认邮件。完成确认后，就可以直接使用。</p>
+          <p className="auth-notice" role="status">确认邮件已经发出，点邮件里的链接就能用了。</p>
         ) : null}
         <form action={isSignup ? signup : login} className="login-form">
           <label>
@@ -95,7 +90,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <AuthSubmitButton isSignup={isSignup} />
         </form>
         <p className="login-note">
-          内容仅自己可见。主动使用AI，或开启回看后，必要原文会交给DeepSeek处理。请勿记录工作机密。
+          内容只有你自己能看到。用 AI 功能时，相关文字会发给 DeepSeek，别写工作机密。
         </p>
       </section>
     </main>

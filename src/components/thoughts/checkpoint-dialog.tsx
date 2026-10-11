@@ -52,7 +52,7 @@ export function CheckpointDialog({ open, onSave }: {
       requestIdsRef.current = null
       overlay.close('checkpoint')
     } catch {
-      setError('保存结果未确认。保持原内容可安全重试；修改后会作为新的检查点保存。')
+      setError('不确定保存成功了没有，再点一次就行，不会重复保存。')
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -71,9 +71,9 @@ export function CheckpointDialog({ open, onSave }: {
     >
       <header>
         <h2 id="checkpoint-dialog-title">先到这里</h2>
-        <button type="button" aria-label={saving ? '正在保存，暂时无法关闭' : '关闭检查点'} disabled={saving} onClick={close}>关闭</button>
+        <button type="button" aria-label={saving ? '正在保存，暂时无法关闭' : '关闭'} disabled={saving} onClick={close}>关闭</button>
       </header>
-      <p id="checkpoint-dialog-description">保存一个检查点，然后回到全部想法。</p>
+      <p id="checkpoint-dialog-description">可以写一句下次回来时想看到的话，也可以不写。</p>
       <label>
         下次从哪里接着想？（可不填）
         <textarea

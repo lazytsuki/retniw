@@ -17,7 +17,7 @@ export function LocalDrafts({
   return (
     <details className={styles.drafts}>
       <summary>本机草稿 <span>{drafts.length}</span></summary>
-      <p className={styles.description}>还没有保存到想法中，仅保留在这个浏览器。打开后可以继续写。</p>
+      <p className={styles.description}>还没保存，只存在这个浏览器里。</p>
       <ul>
         {drafts.map((draft) => (
           <li key={draft.entryId}>

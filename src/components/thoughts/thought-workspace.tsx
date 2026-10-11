@@ -524,8 +524,7 @@ export function ThoughtWorkspace({
             <h1 className="workspace-kicker">当前想法</h1>
           ) : (
             <div className="workspace-heading-copy">
-              <h1>写下你正在想的。</h1>
-              <p className="workspace-intro">先留下一句，以后可以接着写。</p>
+              <h1>新想法</h1>
             </div>
           )}
           <div className="workspace-heading-actions">
@@ -634,7 +633,7 @@ export function ThoughtWorkspace({
             onClick={(event) => overlay.open('checkpoint', event.currentTarget)}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v16M7 5h10l-2.5 4L17 13H7" /></svg>
-            {checkpointPending ? '正在保存检查点' : '先到这里'}
+            {checkpointPending ? '正在保存' : '先到这里'}
           </button>
         )}
         {serverReady && entries.length > 0 && (

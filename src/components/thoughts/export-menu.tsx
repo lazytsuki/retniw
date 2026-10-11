@@ -74,11 +74,11 @@ export function ExportMenu({ thoughtId, userId, entries, checkpoints, localItems
           : createCurrentThoughtMarkdown({ userId, thoughtId, entries, checkpoints, localItems: snapshot, offline, exportedAt })
         downloadTextFile(markdown, `retniw-${thoughtId}${offline ? '-offline-snapshot' : ''}.md`, 'text/markdown; charset=utf-8')
         setStatus(offline
-          ? '未取得云端完整内容，已下载当前页面与本机内容的离线快照。'
-          : cloudThoughtReady ? '下载已开始，已包含这个想法的云端原文与本机内容。' : '本机内容快照下载已开始。')
+          ? '没连上服务器，下载的是页面上已经加载的内容。'
+          : cloudThoughtReady ? '已开始下载。' : '已开始下载。')
       } else if (kind === 'local') {
         downloadTextFile(createLocalContentJson(userId, snapshot, undefined, exportedAt, offline), `retniw-local-${date}.json`, 'application/json; charset=utf-8')
-        setStatus(offline ? '本机内容的离线快照下载已开始。' : '本机内容下载已开始。')
+        setStatus(offline ? '已开始下载。' : '已开始下载。')
       } else {
         const downloadUrl = new URL('/api/export', window.location.href)
         downloadUrl.searchParams.set(expectedUserIdQuery, userId)
@@ -88,8 +88,8 @@ export function ExportMenu({ thoughtId, userId, entries, checkpoints, localItems
         document.body.append(frame)
         window.setTimeout(() => frame.remove(), 60_000)
         setStatus(snapshot.length > 0
-          ? '云端下载已开始。本机内容请另点“下载本机内容”。'
-          : '云端下载已开始。')
+          ? '已开始下载。还没同步的内容要另外点“导出还没同步的内容”。'
+          : '已开始下载。')
       }
 
     } catch (error) {
@@ -113,20 +113,20 @@ export function ExportMenu({ thoughtId, userId, entries, checkpoints, localItems
       {canExportCurrent && (
         <button
           type="button"
-          aria-label={cloudThoughtReady && online ? '导出当前想法为 Markdown' : '导出当前页面快照为 Markdown'}
+          aria-label={cloudThoughtReady && online ? '导出这个想法为 Markdown' : '把页面上已加载的内容导出为 Markdown'}
           role="menuitem"
           disabled={preparing || localWritePending || authBlocked || authContextChanged}
           onClick={() => void download('current')}
         >
-          {cloudThoughtReady && online ? '导出这个想法（完整）' : '导出当前页面快照'}
+          {cloudThoughtReady && online ? '导出为 Markdown' : '导出已加载的内容'}
         </button>
       )}
-      <button type="button" aria-label="导出云端全部想法为 JSON" role="menuitem" disabled={preparing || localWritePending || authBlocked || authContextChanged} onClick={() => void download('cloud')}>导出云端全部想法</button>
+      <button type="button" aria-label="导出全部想法为 JSON" role="menuitem" disabled={preparing || localWritePending || authBlocked || authContextChanged} onClick={() => void download('cloud')}>导出全部想法（JSON）</button>
       {hasLocalContent && <>
-        <button type="button" aria-label="下载本机草稿和未同步内容为 JSON" role="menuitem" disabled={preparing || localWritePending || authBlocked || authContextChanged} onClick={() => void download('local')}>下载本机内容</button>
-        <span>云端导出不含本机草稿和未同步内容。导出这个想法会一并带上。</span>
+        <button type="button" aria-label="把还没同步的内容导出为 JSON" role="menuitem" disabled={preparing || localWritePending || authBlocked || authContextChanged} onClick={() => void download('local')}>导出还没同步的内容</button>
+        <span>“导出全部想法”不含还没同步的内容，“导出为 Markdown”会带上。</span>
       </>}
-      {!online && <span>当前离线，快照只含页面已加载的原文与本机内容。</span>}
+      {!online && <span>现在离线，只能导出页面上已经加载的内容。</span>}
       {status && <span role="status">{status}</span>}
     </div>
   )
