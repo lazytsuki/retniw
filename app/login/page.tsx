@@ -90,7 +90,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <AuthSubmitButton isSignup={isSignup} />
         </form>
         <p className="login-note">
-          内容只有你自己能看到。用 AI 功能时，相关文字会发给 DeepSeek，别写工作机密。
+          内容只有你自己能看到。用 AI 功能时，相关文字会发给 DeepSeek；开启回看后，普通保存也会在后台把相关文字发给 DeepSeek。别写工作机密。
         </p>
       </section>
     </main>

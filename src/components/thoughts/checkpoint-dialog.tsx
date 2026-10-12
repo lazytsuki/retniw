@@ -52,7 +52,7 @@ export function CheckpointDialog({ open, onSave }: {
       requestIdsRef.current = null
       overlay.close('checkpoint')
     } catch {
-      setError('不确定保存成功了没有，再点一次就行，不会重复保存。')
+      setError('不确定保存成功了没有。不改内容再试，不会重复保存；改过内容再试会新建检查点，可能重复保存。')
     } finally {
       savingRef.current = false
       setSaving(false)
