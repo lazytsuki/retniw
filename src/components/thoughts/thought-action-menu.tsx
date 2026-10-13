@@ -225,7 +225,7 @@ export function ThoughtActionMenu({
         onChoose={chooseCollection}
       />
       {moveState === 'pending' && <p className="collection-picker-layer__status" role="status">正在移入</p>}
-      {moveState === 'error' && <p className="collection-picker-layer__status collection-picker-layer__status--error" role="alert">移入结果未确认，可以重试。</p>}
+      {moveState === 'error' && <p className="collection-picker-layer__status collection-picker-layer__status--error" role="alert">不确定移好了没有，可以再试一次。</p>}
     </div>
   ) : null
 

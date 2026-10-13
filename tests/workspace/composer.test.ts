@@ -9,7 +9,7 @@ describe('thought composer keyboard behavior', () => {
     })
     expect(thoughtComposerCopy(true)).toEqual({
       ariaLabel: '继续写',
-      placeholder: '补充一个新的点，或继续刚才的思路',
+      placeholder: '接着写',
     })
   })
 

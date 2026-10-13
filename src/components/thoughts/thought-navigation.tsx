@@ -391,7 +391,7 @@ export function ThoughtNavigation({
         next.delete(thought.id)
         return next
       })
-      setLoadError('操作结果未确认，可以重试。')
+      setLoadError('不确定成功了没有，可以再试一次。')
     }
   }
 
@@ -452,7 +452,7 @@ export function ThoughtNavigation({
       } else {
         router.refresh()
         if (!deleteDialogDismissedRef.current) focusAfterMutation(pendingDeleteFocusRef.current)
-        if (localCleanupFailed) setLoadError('想法已删除，本机待同步记录未清理。')
+        if (localCleanupFailed) setLoadError('想法已删除，但这台设备上还留着它没同步的内容。')
       }
     } catch {
       setRemovedIds((current) => {
@@ -462,9 +462,9 @@ export function ThoughtNavigation({
       })
       if (deleteDialogDismissedRef.current) {
         setPendingDelete(null)
-        setLoadError('删除结果未确认，请重试。')
+        setLoadError('不确定删掉了没有，请再试一次。')
       } else {
-        setDeleteError('删除结果未确认，请重试。')
+        setDeleteError('不确定删掉了没有，请再试一次。')
       }
     } finally {
       setDeletingThought(false)
@@ -566,9 +566,9 @@ export function ThoughtNavigation({
     } catch {
       if (collectionDeleteDialogDismissedRef.current) {
         setPendingCollectionDelete(null)
-        setLoadError('删除合集的结果未确认，请重试。')
+        setLoadError('不确定合集删掉了没有，请再试一次。')
       } else {
-        setCollectionDeleteError('删除合集的结果未确认，请重试。')
+        setCollectionDeleteError('不确定合集删掉了没有，请再试一次。')
       }
     } finally {
       setDeletingCollection(false)

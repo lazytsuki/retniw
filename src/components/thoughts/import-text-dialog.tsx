@@ -97,7 +97,7 @@ export function ImportTextDialog({ open, currentAllowed, onClose, onImport }: Im
       reset()
       onClose()
     } catch {
-      setError('导入结果未确认。保持原内容可安全重试；修改后会作为新的导入保存。')
+      setError('不确定导入成功了没有。不做修改直接重试，不会重复导入；改过内容、来源名称、文件或导入位置后再试，会重新导入，可能重复保存。')
     } finally {
       savingRef.current = false
       setSaving(false)

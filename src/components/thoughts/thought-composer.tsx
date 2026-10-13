@@ -17,7 +17,7 @@ type ThoughtComposerProps = {
 
 export function thoughtComposerCopy(hasEntries: boolean) {
   return hasEntries
-    ? { ariaLabel: '继续写', placeholder: '补充一个新的点，或继续刚才的思路' }
+    ? { ariaLabel: '继续写', placeholder: '接着写' }
     : { ariaLabel: '写在这里', placeholder: '从这里开始写' }
 }
 

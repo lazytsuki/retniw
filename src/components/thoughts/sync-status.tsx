@@ -35,19 +35,19 @@ export function SyncStatus({
   if (authContextChanged) {
     currentStatus = (
       <div className="sync-status sync-status--failed" role="alert">
-        <span>账号已在其他页面切换，未同步内容仍保留在本机。</span>
+        <span>你在别的页面换了账号，没同步的内容还在这台设备上。</span>
         <button type="button" onClick={() => window.location.reload()}>刷新后继续</button>
       </div>
     )
   } else if (failed || hasGlobalFailure) {
     currentStatus = (
       <div className="sync-status sync-status--failed" role="status">
-        <span>有内容尚未同步，可以重试</span>
+        <span>有内容没同步上，可以重试</span>
         <button type="button" onClick={onRetry}>重试</button>
       </div>
     )
   } else if (items.length && drafts === items.length) {
-    currentStatus = <p className="sync-status" role="status">已保存在本机</p>
+    currentStatus = <p className="sync-status" role="status">已存在这台设备上</p>
   } else if (syncing || pending) {
     currentStatus = <p className="sync-status" role="status">正在同步</p>
   }
@@ -63,7 +63,7 @@ export function SyncStatus({
             setLegacyRecovery('pending')
             void onRecoverLegacy().catch(() => setLegacyRecovery('error'))
           }}
-        >{legacyRecovery === 'pending' ? '正在恢复' : '确认属于当前账号并恢复'}</button>
+        >{legacyRecovery === 'pending' ? '正在恢复' : '恢复到当前账号'}</button>
         {legacyRecovery === 'error' && <span role="alert">没有恢复，可以重试。</span>}
       </div>
     ) : null}

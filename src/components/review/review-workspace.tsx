@@ -120,13 +120,13 @@ function ConnectionCard({
         </div>
       </div>
       <div className={styles.reason}>
-        <span><ConnectionMark />{connection.status === 'confirmed' ? '联系说明 · AI提出' : '可能的联系 · AI提出'}</span>
+        <span><ConnectionMark />{connection.status === 'confirmed' ? 'AI 的理由' : 'AI 的理由'}</span>
         <p>{connection.rationale}</p>
       </div>
       {onDecide ? (
         <div className={styles.actions}>
           <button data-decision="confirmed" type="button" disabled={disabled} onClick={() => onDecide('confirmed')}>
-            {deciding ? '正在保存' : '保留联系'}
+            {deciding ? '正在保存' : '保留'}
           </button>
           <button data-decision="rejected" type="button" disabled={disabled} onClick={() => onDecide('rejected')}>忽略</button>
         </div>
@@ -236,16 +236,16 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
       if (!response.ok || !payload?.data?.status) throw new Error('SCAN_FAILED')
       scanRequestIdRef.current = null
       if (payload.data.status === 'disabled') {
-        setMessage('先开启自动串联，再开始串联。')
+        setMessage('先开启，才能开始找。')
         return
       }
       if (payload.data.status === 'provider-failed') {
-        setMessage('DeepSeek这次没有完成比较。可以再串联一次，你写下的内容不受影响。')
+        setMessage('DeepSeek 这次没返回结果，可以再试一次。')
         return
       }
       if (payload.data.status === 'not-enough-content') {
         setNeedsMoreThoughts(true)
-        setNotice('至少需要两条不同的想法。写下另一个念头后，再回来串联。')
+        setNotice('至少要有两条想法才能比较。')
         return
       }
       const created = payload.data.created ?? 0
@@ -258,7 +258,7 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
       }
       setNotice(created > 0
         ? `找到了${created}条联系，等你判断。`
-        : '这次没有找到新的明确联系。')
+        : '这次没找到有关联的。')
     } catch {
       setMessage('这次没有完成，可以重试。')
     } finally {
@@ -378,23 +378,22 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
         <div>
           <p className={styles.eyebrow}>以前的想法</p>
           <h1 id="review-title">回看</h1>
-          <p className={styles.tagline}>把分散的念头放在一起，找到值得继续想的地方。</p>
         </div>
         {preference.enabled ? (
           <button type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void setEnabled(false)}>
-            {preferenceAction === 'disabling' ? '正在暂停' : '暂停自动串联'}
+            {preferenceAction === 'disabling' ? '正在关闭' : '关闭'}
           </button>
         ) : null}
       </header>
 
       <div className={styles.intro} aria-busy={scanning || undefined}>
-        <h2><ConnectionMark />{preference.enabled ? '自动串联已开启' : '串联已有想法'}</h2>
+        <h2><ConnectionMark />{preference.enabled ? '已开启' : '找找以前想法之间的联系'}</h2>
         <p id="review-intro-description">
           {preference.enabled
-            ? '手动串联时，DeepSeek会比较最多20条最近想法的开头和最新一段原文，提出最多3条有依据的联系。'
-            : '默认关闭。开启后，DeepSeek会先比较最多20条最近想法的开头和最新一段原文，提出最多3条有依据的联系。'}
+            ? '点下面的按钮，会把最近 20 条想法的开头和最新一段发给 DeepSeek，找出最多 3 组可能有关的。'
+            : '默认关闭。开启后，会把最近 20 条想法的开头和最新一段发给 DeepSeek，找出最多 3 组可能有关的。'}
         </p>
-        <p id="review-automatic-description">以后保存新内容时，也会把新写的一段与最多20条历史想法的开头交给DeepSeek比较。只处理你写下或导入的原文，不改写，也不自动保留。</p>
+        <p id="review-automatic-description">开启后，每次保存新内容也会自动比较一次。AI 不会改你的原文，也不会替你决定保留哪条。</p>
         <button
           ref={primaryActionRef}
           type="button"
@@ -405,14 +404,14 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
             : void setEnabled(true, true)}
         >
           {preferencePending
-            ? preferenceAction === 'disabling' ? '正在暂停' : '正在开启'
+            ? preferenceAction === 'disabling' ? '正在关闭' : '正在开启'
             : scanning
-              ? '正在串联'
+              ? '正在找'
               : preference.enabled
-                ? '再串联一次'
-                : '开启并开始串联'}
+                ? '再找一次'
+                : '开启并开始找'}
         </button>
-        {scanning ? <p className={styles.scanStatus} role="status">正在比较原文，寻找有依据的联系。你可以先回到想法继续写。</p> : null}
+        {scanning ? <p className={styles.scanStatus} role="status">正在比较，可能要几十秒。可以先回去写。</p> : null}
       </div>
 
       {message ? <p className={styles.error} role="alert">{message}</p> : null}
@@ -421,10 +420,9 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
 
       {(preference.enabled || hasReviewContent) ? <section className={styles.listSection} aria-labelledby="pending-title">
         <div className={styles.sectionHeading}>
-          <h2 id="pending-title" ref={pendingHeadingRef} tabIndex={-1}>等你判断</h2>
+          <h2 id="pending-title" ref={pendingHeadingRef} tabIndex={-1}>待处理</h2>
           {pendingCount ? <span>{pendingCount}</span> : null}
         </div>
-        {pending.items.length ? <p className={styles.sectionDescription}>先读两段原文，再决定是否保留联系。原文始终可以打开，接着写。</p> : null}
         {pending.items.length ? (
           <div className={styles.list} ref={pendingListRef}>
             {pending.items.map((connection) => (
@@ -439,12 +437,12 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
           </div>
         ) : (
           <p className={styles.empty}>{scanning
-            ? '找到的联系会出现在这里，等你判断。'
+            ? '找到的会出现在这里。'
             : needsMoreThoughts
-              ? '有了两条不同的想法，才有可以比较的内容。'
+              ? '至少要有两条想法。'
               : preference.enabled
-                ? '暂时没有待判断的联系。可以继续写，或再串联一次已有想法。'
-                : '自动串联已暂停。重新开启后，可以继续寻找联系。'}</p>
+                ? '现在没有待处理的。'
+                : '已关闭。'}</p>
         )}
         {pending.nextCursor ? (
           <button className={styles.more} type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void loadMore('pending')}>
@@ -462,7 +460,7 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
             ))}
           </div>
         ) : (
-          <p className={styles.empty}>保留的联系会留在这里，两段原文仍各自保存。</p>
+          <p className={styles.empty}>还没有保留的。</p>
         )}
         {confirmed.nextCursor ? (
           <button className={styles.more} type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void loadMore('confirmed')}>
