@@ -2895,6 +2895,66 @@ a.fragment-card:hover {
   color: var(--accent);
 }
 
+.product-video-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.product-video-play {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding-left: 2px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.product-video-duration {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-video-trigger:hover { color: var(--accent); }
+.product-video-trigger:hover .product-video-play { border-color: var(--accent); }
+.product-video-trigger:focus-visible,
+.product-video-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
+
+.product-video-dialog {
+  width: min(1080px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #101312;
+  color: var(--text-primary);
+  box-shadow: 0 24px 100px #0008;
+}
+
+.product-video-dialog::backdrop { background: rgb(0 0 0 / 78%); }
+.product-video-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 12px 8px 20px; }
+.product-video-header h2 { margin: 0; font-size: 14px; font-weight: 400; color: var(--text-secondary); }
+.product-video-close { width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.product-video-close:hover { background: var(--surface-input); color: var(--accent); }
+.product-video-dialog video { display: block; width: 100%; max-height: calc(100dvh - 110px); aspect-ratio: 16 / 9; background: #101312; }
+.product-video-error { margin: 0; padding: 16px 20px; font-size: 14px; }
+
 .welcome-account {
   width: 100%;
   margin: 0;

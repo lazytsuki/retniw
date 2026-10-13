@@ -4,6 +4,7 @@ import { createServerAuthClient } from '@/src/lib/supabase/server'
 import { MIN_PASSWORD_LENGTH } from '@/src/lib/auth/credentials'
 import { login, signup } from './actions'
 import { AuthSubmitButton } from './auth-submit-button'
+import { ProductVideo } from './product-video'
 import { RetniwSymbol } from '@/src/components/app-header'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <section className="welcome-intro" aria-labelledby="welcome-title">
         <p className="login-brand"><RetniwSymbol /><span>retniw</span></p>
         <h1 id="welcome-title">记录尚未成形的想法</h1>
+        <ProductVideo />
       </section>
       <section className="panel welcome-account" aria-labelledby="login-title">
         <nav className="auth-mode-switch" aria-label="账号入口">
