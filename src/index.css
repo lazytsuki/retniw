@@ -2875,13 +2875,6 @@ a.fragment-card:hover {
   letter-spacing: -.035em;
 }
 
-.welcome-description {
-  margin: 24px 0 0;
-  color: var(--text-secondary);
-  font-size: 16px;
-  line-height: 1.9;
-}
-
 .welcome-principles {
   margin-top: 38px;
   padding-top: 24px;
@@ -2954,11 +2947,6 @@ a.fragment-card:hover {
 
   .welcome-intro h1 {
     font-size: 34px;
-  }
-
-  .welcome-description {
-    margin-top: 16px;
-    font-size: 14px;
   }
 
   .welcome-principles,

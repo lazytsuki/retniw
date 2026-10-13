@@ -40,7 +40,7 @@ describe('sync status', () => {
   })
 
   it('shows that a draft is safely stored locally', () => {
-    expect(renderStatus([baseItem], { syncing: true })).toContain('已存在这台设备上')
+    expect(renderStatus([baseItem], { syncing: true })).toContain('草稿已保存在此设备')
   })
 
   it('shows pending work as syncing', () => {
@@ -53,7 +53,7 @@ describe('sync status', () => {
       { ...baseItem, entryId: 'later-entry', state: 'pending' },
     ], { syncing: true })
 
-    expect(markup).toContain('有内容没同步上，可以重试')
+    expect(markup).toContain('部分内容未能同步')
     expect(markup).toContain('>重试</button>')
     expect(markup).not.toContain('正在同步')
   })
@@ -61,7 +61,7 @@ describe('sync status', () => {
   it('surfaces a failure from another thought without showing its unrelated draft', () => {
     const markup = renderStatus([], { hasGlobalFailure: true })
 
-    expect(markup).toContain('有内容没同步上，可以重试')
+    expect(markup).toContain('部分内容未能同步')
     expect(markup).toContain('>重试</button>')
   })
 

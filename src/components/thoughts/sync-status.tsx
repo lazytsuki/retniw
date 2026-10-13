@@ -42,12 +42,12 @@ export function SyncStatus({
   } else if (failed || hasGlobalFailure) {
     currentStatus = (
       <div className="sync-status sync-status--failed" role="status">
-        <span>有内容没同步上，可以重试</span>
+        <span>部分内容未能同步</span>
         <button type="button" onClick={onRetry}>重试</button>
       </div>
     )
   } else if (items.length && drafts === items.length) {
-    currentStatus = <p className="sync-status" role="status">已存在这台设备上</p>
+    currentStatus = <p className="sync-status" role="status">草稿已保存在此设备</p>
   } else if (syncing || pending) {
     currentStatus = <p className="sync-status" role="status">正在同步</p>
   }

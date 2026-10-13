@@ -88,7 +88,7 @@ describe('cross-thought review workspace', () => {
     expect(workspace.indexOf('{connection.source.excerpt}')).toBeLessThan(workspace.indexOf('{connection.rationale}'))
     expect(workspace.indexOf('{connection.target.excerpt}')).toBeLessThan(workspace.indexOf('{connection.rationale}'))
     expect(workspace).toContain('AI 的理由')
-    expect(workspace).toContain('还没有保留的。')
+    expect(workspace).toContain('尚未保留任何联系。')
     expect(workspace).toContain('读完整想法')
   })
 

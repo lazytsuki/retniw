@@ -85,9 +85,9 @@ describe('signup action', () => {
     const transition = await readFile('app/auth/created/account-created-transition.tsx', 'utf8')
     const page = await readFile('app/auth/created/page.tsx', 'utf8')
 
-    expect(transition).toContain('账号建好了')
+    expect(transition).toContain('账号已创建')
     expect(transition).toContain("window.location.replace('/')")
-    expect(transition).toContain('直接进入')
+    expect(transition).toContain('进入 retniw')
     expect(page).toContain('await requireUser()')
   })
 
