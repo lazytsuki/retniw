@@ -35,16 +35,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="welcome-shell" id="main-content" tabIndex={-1}>
       <section className="welcome-intro" aria-labelledby="welcome-title">
         <p className="login-brand"><RetniwSymbol /><span>retniw</span></p>
-        <h1 id="welcome-title">记想法的地方</h1>
-        <p className="welcome-description">想到什么就写下来。之后可以接着写，也能搜到以前写过的。</p>
+        <h1 id="welcome-title">记录尚未成形的想法</h1>
       </section>
       <section className="panel welcome-account" aria-labelledby="login-title">
         <nav className="auth-mode-switch" aria-label="账号入口">
           <Link href="/login" aria-current={!isSignup ? 'page' : undefined}>登录</Link>
           <Link href="/login?mode=signup" aria-current={isSignup ? 'page' : undefined}>创建账号</Link>
         </nav>
-        <h2 id="login-title">{isSignup ? '创建账号' : '登录'}</h2>
-        {isSignup ? <p className="muted">用邮箱注册，密码自己设。</p> : null}
+        <h2 id="login-title">{isSignup ? '创建账号' : '欢迎回来'}</h2>
         {notice === 'check-email' ? (
           <p className="auth-notice" role="status">确认邮件已经发出，点邮件里的链接就能用了。</p>
         ) : null}
@@ -74,7 +72,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </label>
           {isSignup ? (
             <label>
-              再输一次密码
+              确认密码
               <input
                 name="passwordConfirmation"
                 type="password"
@@ -90,7 +88,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <AuthSubmitButton isSignup={isSignup} />
         </form>
         <p className="login-note">
-          内容只有你自己能看到。用 AI 功能时，相关文字会发给 DeepSeek；开启回看后，普通保存也会在后台把相关文字发给 DeepSeek。别写工作机密。
+          内容不向其他用户公开。使用 AI 功能时，相关文字会发送至 DeepSeek；开启回看后，普通保存也会在后台将相关文字发送至 DeepSeek。请勿记录工作机密。
         </p>
       </section>
     </main>

@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'retniw',
     short_name: 'retniw',
-    description: '记想法的地方。',
+    description: '记录尚未成形的想法。',
     start_url: '/',
     display: 'standalone',
     background_color: '#101312',

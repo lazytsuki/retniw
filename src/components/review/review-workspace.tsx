@@ -460,7 +460,7 @@ export function ReviewWorkspace({ initialData, userId }: { initialData: ReviewIn
             ))}
           </div>
         ) : (
-          <p className={styles.empty}>还没有保留的。</p>
+          <p className={styles.empty}>尚未保留任何联系。</p>
         )}
         {confirmed.nextCursor ? (
           <button className={styles.more} type="button" disabled={preferencePending || scanning || loadingMore !== null || decidingId !== null} onClick={() => void loadMore('confirmed')}>
