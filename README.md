@@ -60,7 +60,7 @@ npm run metrics:product
 
 ## 本地开发
 
-需要 Node.js 20.9 或更高版本，以及一个已经创建 retniw 所需数据表的 Supabase 项目。
+需要 Node.js 22 或更高版本，以及一个已经创建 retniw 所需数据表的 Supabase 项目。
 
 ```bash
 npm install
