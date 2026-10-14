@@ -1,13 +1,5 @@
 import { ApiError } from '@/src/lib/api-error'
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-type FragmentInput = {
-  clientRequestId: string
-  content: string
-  inputMode: 'text' | 'voice'
-}
-
 export type EntryInput = {
   content: string
   entryType: 'user' | 'import'
@@ -46,24 +38,4 @@ export function parseEntryInput(body: unknown): EntryInput {
   }
 
   return { content: input.content, entryType: 'import', sourceLabel: sourceLabel || null }
-}
-
-export function parseFragmentInput(body: unknown): FragmentInput {
-  const input = body as Record<string, unknown> | null
-  const clientRequestId = input?.clientRequestId
-  const content = input?.content
-  const inputMode = input?.inputMode
-
-  if (
-    typeof clientRequestId !== 'string' ||
-    !uuidPattern.test(clientRequestId) ||
-    typeof content !== 'string' ||
-    content.trim().length < 1 ||
-    content.trim().length > 10_000 ||
-    (inputMode !== 'text' && inputMode !== 'voice')
-  ) {
-    throw new ApiError(400, 'INVALID_INPUT', 'Invalid fragment input')
-  }
-
-  return { clientRequestId, content, inputMode }
 }

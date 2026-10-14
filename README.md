@@ -85,7 +85,7 @@ npm run dev
 
 浏览器打开 [http://localhost:3000](http://localhost:3000)。
 
-> 本仓库只包含增量数据库迁移，不能直接初始化空的 Supabase 项目。`supabase-schema.sql` 不适用于当前应用；数据结构与迁移说明见 [TECH-DESIGN.md](TECH-DESIGN.md) 和 `supabase/migrations`。
+> 本仓库只包含增量数据库迁移，不能直接初始化空的 Supabase 项目；数据结构与迁移说明见 [TECH-DESIGN.md](TECH-DESIGN.md) 和 `supabase/migrations`。
 
 ## 验证
 
