@@ -5,6 +5,7 @@ export class ApiError extends Error {
       | 'INVALID_INPUT'
       | 'UNAUTHENTICATED'
       | 'AUTH_CONTEXT_CHANGED'
+      | 'FORBIDDEN'
       | 'NOT_FOUND'
       | 'STATE_CONFLICT'
       | 'THOUGHT_DELETED'

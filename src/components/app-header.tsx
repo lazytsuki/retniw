@@ -6,6 +6,7 @@ import type { MouseEvent } from 'react'
 import { updateNickname, type NicknameActionState } from '@/app/account/actions'
 import { logout } from '@/app/auth/actions'
 import type { AccountProfile } from '@/src/lib/auth/account-profile'
+import { AccessTokenSection } from './access-token-section'
 import { useDismissibleLayer, useOverlayController } from './overlay-provider'
 import { VisibleProductEvent } from './product-event-sender'
 import { useWorkspaceSidebar } from './workspace-sidebar-provider'
@@ -161,6 +162,7 @@ export function AppHeader({ account, userId }: { account?: AccountProfile; userI
               >{nicknameState.message}</p>
             ) : null}
           </form>
+          {userId ? <AccessTokenSection userId={userId} /> : null}
           <form action={logout}>
             <input name="expectedUserId" type="hidden" value={userId ?? ''} />
             <button type="submit">退出登录</button>

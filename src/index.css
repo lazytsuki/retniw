@@ -430,6 +430,58 @@ a {
   color: #d5a09a;
 }
 
+.account-menu__tokens {
+  display: grid;
+  gap: 7px;
+  padding: 4px 0 8px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.account-menu__panel .account-menu__tokens-toggle {
+  width: 100%;
+  margin-top: 4px;
+  text-align: left;
+}
+
+.account-menu__tokens-body {
+  display: grid;
+  gap: 9px;
+  padding: 0 2px;
+}
+
+.account-menu__token-created {
+  display: grid;
+  gap: 6px;
+}
+
+.account-menu__token-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-menu__token-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-menu__token-name {
+  overflow: hidden;
+  color: rgb(245 245 243 / 76%);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu__panel .account-menu__token-list button {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
 .account-menu__panel > form:last-child {
   padding-top: 8px;
   border-top: 1px solid rgb(255 255 255 / 8%);

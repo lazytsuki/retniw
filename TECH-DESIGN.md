@@ -22,6 +22,8 @@
 | [`ThoughtConnectionRepository.listForReview`](src/server/repositories/thought-connection-repository.ts#listForReview)、[`countForReview`](src/server/repositories/thought-connection-repository.ts#countForReview) | 联系读取 | 四个精确外键内连接先过滤可见关系，再分页、计数并直接序列化 |
 | `product_events`、`POST /api/product-events` | 使用行为 | 固定记录工作区、回看、主动串联结果和联系原文打开事件；事件失败不阻断产品动作 |
 | [`scripts/report-product-metrics.mjs`](scripts/report-product-metrics.mjs) | 聚合指标 | 用户输入与导入分开统计，输出24小时首次用户输入、跨日继续、AI保存结果、回看和联系使用情况，不输出用户或内容标识 |
+| `personal_access_tokens`、[`AccessTokenSection`](src/components/access-token-section.tsx#AccessTokenSection)、`/api/access-tokens` | 访问令牌管理 | 账户菜单生成、列出、撤销；明文只在创建响应中出现一次，库里只存SHA-256 |
+| [`POST /api/v1/entries`](app/api/v1/entries/route.ts#POST)、[`requireTokenUser`](src/lib/auth/require-token-user.ts#requireTokenUser)、`retniw_ensure_token_thought` | 外部写入 | 只认`Authorization: Bearer rtw_…`；按import保存，来源默认令牌名；只能新建想法或追加到该令牌创建过的想法；不提供任何令牌读接口 |
 | [`ThoughtRepository`](src/server/repositories/thought-repository.ts#ThoughtRepository)、`deleted_thought_tombstones`、[`ThoughtExportRepository`](src/server/repositories/thought-export-repository.ts#ThoughtExportRepository) | 生命周期与导出 | 正文及关联数据物理删除；仅保留账号与想法ID组成的删除墓碑，历史软删除行保持隐藏 |
 
 - 产品状态只分三层：用户原文是记录，AI产出的是联系候选，用户保留后才进入回看中的长期联系；不使用图数据库或回看快照表。
@@ -216,6 +218,28 @@ create table public.deleted_thought_tombstones (
   primary key (user_id, thought_id)
 );
 
+create table public.personal_access_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,            -- 1至40字
+  token_hash text not null unique, -- SHA-256十六进制，不存明文
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz null,
+  revoked_at timestamptz null
+);
+
+create table public.personal_access_token_thoughts (
+  token_id uuid not null references public.personal_access_tokens (id) on delete cascade,
+  thought_id uuid not null references public.thoughts (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (token_id, thought_id)
+);
+
+-- retniw_ensure_token_thought在同一咨询锁内：校验令牌未撤销；
+-- 映射已存在则沿用retniw_ensure_thought；thoughts中已有该ID（用户自己的想法）则抛出
+-- RETNIW_TOKEN_THOUGHT_FORBIDDEN；否则创建想法并登记映射。
+
 -- retniw_ensure_thought和retniw_delete_thought对同一user_id + thought_id
 -- 使用同一事务级咨询锁。表级触发器兼容仍在运行的旧实例：删除必写墓碑，
 -- 插入前若命中墓碑则抛出RETNIW_THOUGHT_DELETED。
@@ -257,6 +281,8 @@ type ReviewConnection = {
 - `PATCH /api/review/preference`只接受`{enabled:boolean}`，返回`ReviewPreference`；重复设置同值成功且更新时间不倒退。
 - `POST /api/review/scan`接受可选`{requestId:uuid}`作为事件幂等键；偏好关闭返回`disabled`，少于2条可用想法返回`not-enough-content`，供应商失败返回可重试的`provider-failed`，候选持久化失败返回可重试的`persistence-failed`及已成功保存数，全部处理完成后返回`processed`及本次实际新增候选数。
 - `POST /api/product-events`只接受`workspace_active_day`、`review_opened`和带`requestId / connectionId / thoughtId`的`connection_opened`；`review_scan_finished`只由扫描路由按服务端结果写入。
+- `GET /api/access-tokens`返回当前页面账号未撤销的`{id,name,createdAt,lastUsedAt}`；`POST`接受`{name}`（1至40字），201返回`{token, accessToken}`，超过10个有效令牌409；`DELETE /api/access-tokens/:id`撤销，204，不存在或已撤销404。三者沿用页面账号围栏。
+- `POST /api/v1/entries`只接受`Authorization: Bearer rtw_<43位base64url>`，请求体`{thoughtId, entryId, requestId, content, sourceLabel?}`（UUID，正文1至10000字，来源最多255字，缺省为令牌名）；首次保存201、幂等重放200；缺失或撤销令牌401，向非该令牌创建的想法写入403 `FORBIDDEN`，已删除想法409。保存后与页面导入一样安排回看。
 - `PATCH /api/thought-connections/:id`沿用`{decision:'confirmed'|'rejected'}`；只有pending可决定，重复同一决定幂等成功，相反决定409。
 - 结构化导出继续只包含confirmed关系；thought、entry、checkpoint和connection查询都以未删除thought为集合边界。为兼容`retniw.export.v1`，`deletedAt`字段暂时保留但导出值只会为null。
 
@@ -271,6 +297,8 @@ type ReviewConnection = {
 - 代码回退不会恢复已经物理删除的数据。历史软删除行必须继续保持隐藏，回退方案也要保留这一读取边界。
 - DeepSeek错误、超时和非法响应不得记录原文或供应商响应正文；用户页面不弹阻断提示，只在之后进入回看时看到真实候选状态。
 - `product_events`写入失败只记录固定事件名，不改变工作区、回看、扫描或原文跳转结果。
+- `personal_access_token_thoughts`是指向`thoughts`的新增子引用，外键`ON DELETE CASCADE`，随想法物理删除清理，纳入既有删除语义；删除后令牌再写同ID由墓碑拒绝。迁移`20261027150000_personal_access_tokens.sql`须先于Web发布执行；未执行时只有令牌相关接口失败，既有功能不受影响。
+- 令牌请求不经过页面账号围栏，也不读取浏览器会话；`/api/v1`下的写接口必须调用`requireTokenUser`，由路由守卫测试约束。令牌只有写能力，泄露的影响限于向该账号新建或续写由此令牌创建的想法，用户可随时撤销。
 
 ## 验证映射
 
@@ -291,6 +319,7 @@ type ReviewConnection = {
 | 四类行为事件口径固定且不阻断产品动作，聚合结果不含用户或内容标识。 | `product_events`、事件API与聚合脚本 | 日去重、请求幂等、归属校验、固定字段、级联删除、迁移缺失、0行和聚合输出 | Schema、Repository、API、UI与聚合脚本测试 |
 | 回看列表、计数和候选召回先过滤再分页，不因无效关系或已有pair出现空页、漏项或重复重查。 | `retniw-api`四FK内连接、exact head计数、候选排除下推 | `!inner`过滤顺序、21/20分页、pending首屏计数、合法UUID排除后limit20 | Repository查询测试、PostgREST集成检查 |
 | 删除、回看和导出不泄露旧软删除或他人内容 | `retniw-api`所有权与未删除过滤 | 匿名401、跨账号404、旧软删除ID、导出内容和回看列表检查 | 自动测试、Supabase集成双账号夹具 |
+| 外部工具凭令牌只能写入原话，不能读取或改动用户自己的想法 | `requireTokenUser`、`retniw_ensure_token_thought`、`/api/v1/entries` | 缺失/伪造/撤销令牌401、用户想法403、幂等重放200、import来源、迁移只新增且RLS关闭直读 | `tests/api/access-tokens.test.ts`、`tests/unit/token-thought-guard.test.ts`、上线后真实账号写入 |
 | 当前想法AI仍由用户主动调用且只读当前内容 | `retniw-web`当前工作区；`retniw-api`现有AI路由 | 未点击无请求，点击后请求上下文不含其他thought，回看开关互不影响 | AI route测试、浏览器Network |
 
 ## 设计假设

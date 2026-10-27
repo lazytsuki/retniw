@@ -52,19 +52,28 @@ describe('authenticated mutation identity fence', () => {
   it('guards every API mutation route before repository work', async () => {
     const paths = (await readdir('app/api', { recursive: true }))
       .filter((path) => path.endsWith('route.ts'))
-      .map((path) => `app/api/${path}`)
+      .map((path) => `app/api/${path.replaceAll('\\', '/')}`)
     let mutationCount = 0
+    let tokenMutationCount = 0
 
     for (const path of paths) {
       const source = await readFile(path, 'utf8')
       const methods = source.match(/export async function (?:POST|PATCH|PUT|DELETE)\(/g) ?? []
       if (!methods.length) continue
+      // /api/v1 只接受个人访问令牌：不用浏览器会话，但每个写入都必须先过令牌鉴权
+      if (path.startsWith('app/api/v1/')) {
+        tokenMutationCount += methods.length
+        expect(source, path).not.toContain("from '@/src/lib/auth/require-user'")
+        expect(source.match(/requireTokenUser\(request,/g) ?? [], path).toHaveLength(methods.length)
+        continue
+      }
       mutationCount += methods.length
       expect(source, path).toContain("from '@/src/lib/auth/require-user'")
       expect(source.match(/requireMutationUser\(request\)/g) ?? [], path).toHaveLength(methods.length)
     }
 
-    expect(mutationCount).toBe(18)
+    expect(mutationCount).toBe(20)
+    expect(tokenMutationCount).toBe(1)
   })
 
   it('routes every mounted client mutation through the page-account header helper', async () => {
@@ -78,6 +87,7 @@ describe('authenticated mutation identity fence', () => {
       ['src/components/fragments/clarification-card.tsx', 1],
       ['src/components/fragments/connection-candidate.tsx', 1],
       ['src/components/fragments/fragment-timeline.tsx', 2],
+      ['src/components/access-token-section.tsx', 3],
     ])
 
     for (const [path, minimumCalls] of expected) {
@@ -92,6 +102,7 @@ describe('authenticated mutation identity fence', () => {
       'src/components/review/review-workspace.tsx',
       'src/components/thoughts/thought-navigation.tsx',
       'src/components/fragments/fragment-timeline.tsx',
+      'src/components/access-token-section.tsx',
     ]
     for (const path of paths) {
       const source = await readFile(path, 'utf8')

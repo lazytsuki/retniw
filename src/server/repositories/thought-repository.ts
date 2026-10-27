@@ -71,6 +71,31 @@ export class ThoughtRepository {
     return { thought: toThought(result.thought), created: result.created }
   }
 
+  /** 访问令牌写入：只能创建新想法，或向这个令牌自己创建过的想法追加。 */
+  async ensureForToken(userId: string, tokenId: string, thoughtId: string) {
+    const { data, error } = await this.client
+      .rpc('retniw_ensure_token_thought', {
+        target_user_id: userId,
+        target_token_id: tokenId,
+        target_thought_id: thoughtId,
+      })
+    const result = data as { thought?: ThoughtRecord; created?: boolean } | null
+
+    if (error?.code === 'P0001' && error.message?.startsWith('RETNIW_THOUGHT_DELETED')) {
+      throw new ApiError(409, 'THOUGHT_DELETED', 'Thought was deleted')
+    }
+    if (error?.code === 'P0001' && error.message?.startsWith('RETNIW_TOKEN_THOUGHT_FORBIDDEN')) {
+      throw new ApiError(403, 'FORBIDDEN', '这个令牌只能向自己创建的想法追加内容')
+    }
+    if (error?.code === 'P0001' && error.message?.startsWith('RETNIW_TOKEN_REVOKED')) {
+      throw new ApiError(401, 'UNAUTHENTICATED', 'Access token is invalid or revoked')
+    }
+    if (error || !result?.thought || typeof result.created !== 'boolean') {
+      throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to create thought')
+    }
+    return { thought: toThought(result.thought), created: result.created }
+  }
+
   async getOwned(userId: string, thoughtId: string) {
     const { data, error } = await this.client
       .from('thoughts')
