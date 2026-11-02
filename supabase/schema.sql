@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WOo8BvBdQPAfxmHPVNfQasrjJl9dC5tNoQd8uaHiwRdBFQf6Hpy1wnxU10gcaSD
+\restrict t6tcO5kKNKDd9k2gzG5gbg2xIpN13gpCZoabX21z9pc8e72L2T6mVG5c9yGNc1p
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.11
@@ -1244,8 +1244,6 @@ GRANT ALL ON FUNCTION public.retniw_lock_writable_thought() TO service_role;
 -- Name: TABLE clarifications; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.clarifications TO anon;
-GRANT ALL ON TABLE public.clarifications TO authenticated;
 GRANT ALL ON TABLE public.clarifications TO service_role;
 
 
@@ -1253,8 +1251,6 @@ GRANT ALL ON TABLE public.clarifications TO service_role;
 -- Name: TABLE connections; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.connections TO anon;
-GRANT ALL ON TABLE public.connections TO authenticated;
 GRANT ALL ON TABLE public.connections TO service_role;
 
 
@@ -1269,8 +1265,6 @@ GRANT ALL ON TABLE public.deleted_thought_tombstones TO service_role;
 -- Name: TABLE entries; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.entries TO anon;
-GRANT ALL ON TABLE public.entries TO authenticated;
 GRANT ALL ON TABLE public.entries TO service_role;
 
 
@@ -1278,8 +1272,6 @@ GRANT ALL ON TABLE public.entries TO service_role;
 -- Name: TABLE fragments; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.fragments TO anon;
-GRANT ALL ON TABLE public.fragments TO authenticated;
 GRANT ALL ON TABLE public.fragments TO service_role;
 
 
@@ -1322,8 +1314,6 @@ GRANT ALL ON TABLE public.thought_collections TO service_role;
 -- Name: TABLE thought_connections; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.thought_connections TO anon;
-GRANT ALL ON TABLE public.thought_connections TO authenticated;
 GRANT ALL ON TABLE public.thought_connections TO service_role;
 
 
@@ -1331,8 +1321,6 @@ GRANT ALL ON TABLE public.thought_connections TO service_role;
 -- Name: TABLE thoughts; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.thoughts TO anon;
-GRANT ALL ON TABLE public.thoughts TO authenticated;
 GRANT ALL ON TABLE public.thoughts TO service_role;
 
 
@@ -1407,5 +1395,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WOo8BvBdQPAfxmHPVNfQasrjJl9dC5tNoQd8uaHiwRdBFQf6Hpy1wnxU10gcaSD
+\unrestrict t6tcO5kKNKDd9k2gzG5gbg2xIpN13gpCZoabX21z9pc8e72L2T6mVG5c9yGNc1p
 
