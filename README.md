@@ -96,7 +96,23 @@ npm run dev
 
 浏览器打开 [http://localhost:3000](http://localhost:3000)。
 
-> 本仓库只包含增量数据库迁移，不能直接初始化空的 Supabase 项目。数据结构与迁移说明见 [TECH-DESIGN.md](TECH-DESIGN.md) 和 `supabase/migrations`。
+### 数据库
+
+`supabase/schema.sql` 是线上数据库 `public` 结构的完整快照：表、约束、函数、触发器、行级安全和权限，不含任何数据。新建的 Supabase 项目用它初始化：
+
+```bash
+psql "<新项目的连接地址>" -f supabase/schema.sql
+```
+
+需要 PostgreSQL 17.6 或更高版本的 `psql`；文件里有 `\restrict` 这类 psql 指令，Supabase 网页上的 SQL 编辑器执行不了。`supabase/migrations` 里的迁移已经包含在快照中，初始化后不用再执行。
+
+快照由下面的命令导出（连接地址在 Supabase 项目的 Connect → Direct → Session pooler，去掉其中的密码，运行时会单独询问）。以后每次在线上执行新迁移，都重新导出一次，和迁移文件一起提交：
+
+```bash
+pg_dump "<连接地址>" --schema-only --schema=public --no-owner -f supabase/schema.sql
+```
+
+数据结构说明见 [TECH-DESIGN.md](TECH-DESIGN.md)。
 
 ## 验证
 
